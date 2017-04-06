@@ -3,3 +3,5 @@ build
 *.swo
 *~
 *.pyc
+tags
+docker/builds/
