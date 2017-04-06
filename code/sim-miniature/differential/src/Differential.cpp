@@ -43,6 +43,7 @@ Differential::Differential(const int &argc, char **argv)
   , m_deltaTime()
   , m_leftWheelAngularVelocity(0.0)
   , m_rightWheelAngularVelocity(0.0)
+  , m_globalTime(0.0)
 {
 }
 

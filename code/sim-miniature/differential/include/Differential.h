@@ -56,6 +56,7 @@ class Differential :
   double m_deltaTime;
   double m_leftWheelAngularVelocity;
   double m_rightWheelAngularVelocity;
+  double m_globalTime;
 };
 
 }
