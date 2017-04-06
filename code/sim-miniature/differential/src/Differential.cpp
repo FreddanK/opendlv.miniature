@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <string>
+#include <math.h>
 
 #include <opendavinci/odcore/base/KeyValueConfiguration.h>
 #include <opendavinci/odcore/base/Lock.h>
@@ -125,35 +126,40 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
     double prevYaw = prevRotation.getZ();
     // NOTE: Do not change the code above.
 
+    // Constant definitions
+    double const radiusBody = 0.12; // (m)
+    double const radiusWheel = 0.06; // (m)
+    double const t1 = 3.0; // (s)
+    double const t2 = 10.0; // (s)
+    double const v0 = 0.5; // (m/s)
 
+    // Set the wheel velocities
+    if( m_globalTime <= t1 )
+    {
+      m_rightWheelAngularVelocity = (v0*(m_globalTime/t1))/radiusWheel;
+    }
+    else
+    {
+      m_leftWheelAngularVelocity = (v0*((m_globalTime - t1)/t2))/radiusWheel;
+      m_rightWheelAngularVelocity = v0/radiusWheel;
+    }
 
+    // Kinematic equations below
+    double bodyVelocity = radiusWheel*(m_leftWheelAngularVelocity + m_rightWheelAngularVelocity)/2;
+    double yawRate = -radiusWheel*(m_leftWheelAngularVelocity - m_rightWheelAngularVelocity)/(2*radiusBody); 
 
-    ///// TODO: Add kinematic equations below. Use the prepared class global
-    ///// variables for wheel speeds (already saved, see the below method).
+    // Integrate yawRate so that yaw can be used to calculate velX and velY
+    double yaw = prevYaw + yawRate*m_deltaTime; 
 
-    double velX = 0.0; // Placeholder.
-    double velY = 0.0; // Placeholder.
-    //double yawRate = 0.0; // Placeholder.
+    // Kinematic equations using yaw
+    double velX = bodyVelocity*cos(yaw); 
+    double velY = bodyVelocity*sin(yaw); 
    
-    std::cout << "TODO: Add kinematic equations." << std::endl;
-    ///// Kinematic equations above.
-
-
-
-
-    ///// TODO: Integrate simulation below. The time step is already saved in
-    ///// a global variable.
-
-    double posX = prevPosX; // Placeholder.
-    double posY = prevPosY; // Placeholder.
-    double yaw = prevYaw; // Placeholder.
+    // Integration step to get position
+    double posX = prevPosX + velX*m_deltaTime; 
+    double posY = prevPosY + velY*m_deltaTime; 
     
-    std::cout << "TODO: Integrate simulation." << std::endl;
-    ///// Integration above.
-
-
-
-    
+    m_globalTime = m_globalTime + m_deltaTime;
 
     // Due to a simulation scaling problem, the position is scaled. 
     // NOTE: Do not change the code below.
