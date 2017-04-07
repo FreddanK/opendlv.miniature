@@ -50,7 +50,7 @@ services:
         network_mode: "host"
         depends_on:
             - odsupercomponent
-        command: "/opt/opendlv.miniature/bin/opendlv-sim-miniature-differential --cid=${CID} --freq=20"
+        command: "/opt/opendlv.miniature/bin/opendlv-sim-miniature-differential --cid=${CID} --freq=100"
 
     logic-miniature-navigation:
         build: .
