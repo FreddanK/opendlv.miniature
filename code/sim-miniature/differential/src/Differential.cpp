@@ -136,6 +136,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
     // Set the wheel velocities
     if( m_globalTime <= t1 )
     {
+      m_leftWheelAngularVelocity = 0.0;
       m_rightWheelAngularVelocity = (v0*(m_globalTime/t1))/radiusWheel;
     }
     else if (t1 < m_globalTime && m_globalTime <= t2)
@@ -148,6 +149,9 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
       m_leftWheelAngularVelocity = 0;
       m_rightWheelAngularVelocity = 0;
     }
+
+    //m_leftWheelAngularVelocity = 0.1;
+    //m_rightWheelAngularVelocity = 0.1;
 
     // Kinematic equations below
     double bodyVelocity = radiusWheel*(m_leftWheelAngularVelocity + m_rightWheelAngularVelocity)/2;
@@ -179,13 +183,13 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
     double accY = (velY - prevVelY) / m_deltaTime;
 
     opendlv::data::environment::Point3 position(posX, posY, posZ);
-    opendlv::data::environment::Point3 rotation(1.0, 0.0, yaw);
+    opendlv::data::environment::Point3 rotation(1.0, 0.0, 0.0);
     opendlv::data::environment::Point3 velocity(velX, velY, velZ);
     opendlv::data::environment::Point3 acceleration(accX, accY, accZ);
 
 
     rotation.rotateZ(yaw);
-    //rotation.normalize();
+    rotation.normalize();
 
     opendlv::data::environment::EgoState egoState(position, rotation, velocity,
         acceleration);
