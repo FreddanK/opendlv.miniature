@@ -129,29 +129,6 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
     // Constant definitions
     double const radiusBody = 0.12; // (m)
     double const radiusWheel = 0.06; // (m)
-    double const t1 = 3.0; // (s)
-    double const t2 = 10.0; // (s)
-    double const v0 = 0.5; // (m/s)
-
-    // Set the wheel velocities
-    if( m_globalTime <= t1 )
-    {
-      m_leftWheelAngularVelocity = 0.0;
-      m_rightWheelAngularVelocity = (v0*(m_globalTime/t1))/radiusWheel;
-    }
-    else if (t1 < m_globalTime && m_globalTime <= t2)
-    {
-      m_leftWheelAngularVelocity = (v0*((m_globalTime - t1)/t2))/radiusWheel;
-      m_rightWheelAngularVelocity = v0/radiusWheel;
-    }
-    else
-    {
-      m_leftWheelAngularVelocity = 0;
-      m_rightWheelAngularVelocity = 0;
-    }
-
-    //m_leftWheelAngularVelocity = 0.1;
-    //m_rightWheelAngularVelocity = 0.1;
 
     // Kinematic equations below
     double bodyVelocity = radiusWheel*(m_leftWheelAngularVelocity + m_rightWheelAngularVelocity)/2;
