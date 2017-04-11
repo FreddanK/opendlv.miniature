@@ -123,7 +123,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
     double prevPosX = prevPosition.getX() / 10.0;
     double prevPosY = prevPosition.getY() / 10.0;
 
-    double prevYaw = prevRotation.getZ();
+    double prevYaw = atan2(prevRotation.getY(), prevRotation.getX());
     // NOTE: Do not change the code above.
 
     // Constant definitions
@@ -207,8 +207,8 @@ void Differential::ConvertPwmToWheelAngularVelocity(uint16_t a_pin,
   int32_t const neutralDutyCycleNs = 1500000; 
   int32_t const maxForwardDutyCycleNs = 2000000; 
 
-  double const minReverseAngularVelocity = -1.0;
-  double const maxForwardAngularVelocity = 1.0;
+  double const minReverseAngularVelocity = -10.0;
+  double const maxForwardAngularVelocity = 10.0;
   
   double wheelAngularVelocity;
   if (a_dutyCycleNs > neutralDutyCycleNs) {
