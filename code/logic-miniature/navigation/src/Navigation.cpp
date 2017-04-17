@@ -43,6 +43,10 @@ Navigation::Navigation(const int &argc, char **argv)
     , m_gpioReadings()
     , m_gpioOutputPins()
     , m_pwmOutputPins()
+    , m_stateTimer(0.0)
+    , m_stateTimeout(2.0)
+    , m_deltaTime()
+    , m_currentState(State::stop)
 {
 }
 
@@ -77,6 +81,8 @@ void Navigation::setUp()
   for (auto pin : pwmPinsVector) {
     m_pwmOutputPins.push_back(std::stoi(pin));
   }
+
+  m_deltaTime = 1 / getFrequency();
 }
 
 /*
@@ -105,73 +111,150 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     
     // Constant definintions
     float const MAX_VOLTAGE = 1.8;
-    float const IR_MAX_DISTANCE = 3;
-    float const SONIC_MAX_DISTANCE = 20;
+    float const IR_MAX_DISTANCE = 40;
+    float const SONIC_MAX_DISTANCE = 40;
 
     uint32_t const PWM_NEUTRAL = 1500000;
     uint32_t const PWM_MAX = 2000000;
     uint32_t const PWM_MIN = 1000000;
-    uint32_t const PWM_STEP = 100000;
+    uint32_t const PWM_STEP = 250000;
 
-
-    uint32_t leftOutputPWM = PWM_NEUTRAL;
-    uint32_t rightOutputPWM = PWM_NEUTRAL;
-
-    // Print some data collected from the 'nextContainer' method below.
-    //std::cout << "Reading from analog pin 0: " << voltageReadingPin0 << std::endl;
-    
+    // Read sensors
     float voltageMiddleIR = m_analogReadings[0];
     float voltageRightSonic = m_analogReadings[1];
     float voltageLeftSonic = m_analogReadings[2];
+    float voltageRightIR= m_analogReadings[3];
 
     float distanceMiddleIR = (voltageMiddleIR/MAX_VOLTAGE)*IR_MAX_DISTANCE;
     float distanceRightSonic = (voltageRightSonic/MAX_VOLTAGE)*SONIC_MAX_DISTANCE;
     float distanceLeftSonic = (voltageLeftSonic/MAX_VOLTAGE)*SONIC_MAX_DISTANCE;
+    float distanceRightIR = (voltageRightIR/MAX_VOLTAGE)*IR_MAX_DISTANCE;
 
     std::cout << "Distance middle infrared: " << distanceMiddleIR << std::endl;
     std::cout << "Distance right sonic: " << distanceRightSonic << std::endl;
     std::cout << "Distance left sonic: " << distanceLeftSonic << std::endl;
+    std::cout << "Distance right infrared: " << distanceRightIR << std::endl;
 
-    float d = 2.5;
-    if(distanceMiddleIR > d)
+
+    // Stand still by default
+    uint32_t leftOutputPWM = PWM_NEUTRAL;
+    uint32_t rightOutputPWM = PWM_NEUTRAL;
+
+    if(m_currentState == State::cruise)
     {
-      if(distanceRightSonic > 10 && distanceLeftSonic > 10) 
+
+      // Go forward
+      leftOutputPWM = PWM_NEUTRAL + PWM_STEP;
+      rightOutputPWM = PWM_NEUTRAL + PWM_STEP;
+
+      // Check if need to avoid
+      if(distanceMiddleIR < 3 || distanceRightSonic < 2 || distanceLeftSonic < 2)
       {
-        leftOutputPWM = PWM_NEUTRAL + PWM_STEP;
-        rightOutputPWM = PWM_NEUTRAL + PWM_STEP;
-      }
-      else if(abs(distanceRightSonic - distanceLeftSonic) < 1)  
-      {
-        leftOutputPWM = PWM_NEUTRAL + PWM_STEP;
-        rightOutputPWM = PWM_NEUTRAL + PWM_STEP;
-      }
-      else if(distanceRightSonic > distanceLeftSonic)
-      {
-        int diff = distanceRightSonic - distanceLeftSonic;
-        leftOutputPWM = PWM_NEUTRAL + diff*PWM_STEP;
-        rightOutputPWM = PWM_NEUTRAL + PWM_STEP;
-      }
-      else if(distanceRightSonic < distanceLeftSonic)
-      {
-        int diff = distanceLeftSonic - distanceRightSonic;
-        leftOutputPWM = PWM_NEUTRAL + PWM_STEP;
-        rightOutputPWM = PWM_NEUTRAL + diff*PWM_STEP;
+        if((std::rand() % 5) == 0 && distanceRightSonic < distanceLeftSonic)
+        {
+          m_currentState = State::wallFollow;
+
+          int minTime = 20;
+          int maxTime = 40;
+          int timeScale = 1;
+
+          m_stateTimeout = ((std::rand() % (maxTime-minTime)*timeScale) + minTime*timeScale)/timeScale; 
+          m_stateTimer = 0;
+        }
+        else
+        {
+          if(abs(distanceRightSonic - distanceLeftSonic) < 1)
+          {
+            if(distanceRightIR > 3)
+            {
+              m_currentState = State::avoidRight;
+            }
+            else
+            {
+              m_currentState = State::avoidLeft;
+            }
+          }
+          else if(distanceRightSonic < distanceLeftSonic)
+          {
+            m_currentState = State::avoidLeft;
+          }
+          else
+          {
+            m_currentState = State::avoidRight;
+          }
+
+          int minTime = 0.5;
+          int maxTime = 2;
+          int timeScale = 5;
+          // Random time between minTime and maxTime seconds with (1/timeScale) second steps
+          m_stateTimeout = ((std::rand() % (maxTime-minTime)*timeScale) + minTime*timeScale)/timeScale; 
+          m_stateTimer = 0;
+        }
       }
     }
-    else
+
+    if(m_currentState == State::wallFollow)
     {
-      if(abs(distanceRightSonic - distanceLeftSonic) > 1 && distanceRightSonic > distanceLeftSonic)
+      float targetWallDistance = 2;
+      int controlSignal = 0;
+
+      if(distanceRightIR < 3)
       {
-        leftOutputPWM = PWM_NEUTRAL + PWM_STEP;
-        rightOutputPWM = PWM_NEUTRAL - PWM_STEP;
+        float error = targetWallDistance - distanceRightIR;
+        controlSignal = (float)0.4*error*PWM_STEP;
       }
       else
       {
-        leftOutputPWM = PWM_NEUTRAL - PWM_STEP;
+        controlSignal = (float)-0.65*PWM_STEP;
+      }
+
+      leftOutputPWM = PWM_NEUTRAL + PWM_STEP - controlSignal;
+      rightOutputPWM = PWM_NEUTRAL + PWM_STEP + controlSignal;
+
+
+      if(distanceMiddleIR < 3 || distanceRightSonic < 2)
+      {
+        leftOutputPWM = PWM_NEUTRAL;
         rightOutputPWM = PWM_NEUTRAL + PWM_STEP;
+      }
+
+      if(m_stateTimer > m_stateTimeout) 
+      {
+        m_currentState = State::cruise;
       }
     }
 
+    if(m_currentState == State::avoidLeft)
+    {
+      leftOutputPWM = PWM_NEUTRAL - 0.3*PWM_STEP;
+      rightOutputPWM = PWM_NEUTRAL + PWM_STEP;
+
+      if(m_stateTimer > m_stateTimeout) 
+      {
+        m_currentState = State::cruise;
+      }
+    }
+
+    if(m_currentState == State::avoidRight)
+    {
+      leftOutputPWM = PWM_NEUTRAL + PWM_STEP;
+      rightOutputPWM = PWM_NEUTRAL - 0.3*PWM_STEP;
+
+      if(m_stateTimer > m_stateTimeout) 
+      {
+        m_currentState = State::cruise;
+      }
+    }
+
+    if(m_currentState == State::stop)
+    {
+      leftOutputPWM = PWM_NEUTRAL;
+      rightOutputPWM = PWM_NEUTRAL;
+
+      if(m_stateTimer > m_stateTimeout) m_currentState = State::cruise;
+    }
+
+    m_stateTimer += m_deltaTime;
 
     // Loop through all General Purpose IO (GPIO) pins and randomize their 
     // state. The state is then sent as a message to the module interfacing
@@ -194,6 +277,8 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     //  std::cout << "[" << getName() << "] Sending ToggleRequest: " 
     //      << request.toString() << std::endl;
     //}
+
+    // Send output signals to the motors
 
     if(leftOutputPWM > PWM_MAX) leftOutputPWM = PWM_MAX;
     else if(leftOutputPWM < PWM_MIN) leftOutputPWM = PWM_MIN;

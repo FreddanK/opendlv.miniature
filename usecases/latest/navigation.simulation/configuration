@@ -75,22 +75,22 @@ odsupercomponent.pulsetimeack.exclude = odcockpit
 #
 # CONFIGURATION FOR ODSIMIRUS (infrared and ultrasonic simulation)
 #
-odsimirus.numberOfSensors = 3                   # Number of configured sensors.
+odsimirus.numberOfSensors = 4                   # Number of configured sensors.
 odsimirus.showPolygons = 1                      # Show explicitly all polygons.
 
 odsimirus.sensor0.id = 0                        # This ID is used in SensorBoardData structure.
-odsimirus.sensor0.name = Infrared_FrontRight    # Name of the sensor
+odsimirus.sensor0.name = Infrared_Front         # Name of the sensor
 odsimirus.sensor0.rotZ = 0                      # Rotation of the sensor around the Z-axis in degrees, positive = counterclockwise, negative = clockwise, 0 = 12am, -90 = 3pm, ...
-odsimirus.sensor0.translation = (1.0;0.0;0.0)  # Translation (X;Y;Z) w.r.t. vehicle's center
-odsimirus.sensor0.angleFOV = 5                 # In degrees.
-odsimirus.sensor0.distanceFOV = 3               # In meters.
-odsimirus.sensor0.clampDistance = 2.9           # Any distances greater than this distance will be ignored and -1 will be returned.
+odsimirus.sensor0.translation = (2.0;0.0;0.0)   # Translation (X;Y;Z) w.r.t. vehicle's center
+odsimirus.sensor0.angleFOV = 5                  # In degrees.
+odsimirus.sensor0.distanceFOV = 4               # In meters.
+odsimirus.sensor0.clampDistance = 3.9           # Any distances greater than this distance will be ignored and -1 will be returned.
 odsimirus.sensor0.showFOV = 1                   # Show FOV in monitor.
 
 odsimirus.sensor1.id = 1                        # This ID is used in SensorBoardData structure.
 odsimirus.sensor1.name = UltraSonic_FrontRight  # Name of the sensor
-odsimirus.sensor1.rotZ = -30                    # Rotation of the sensor around the Z-axis in degrees, positive = counterclockwise, negative = clockwise, 0 = 12am, -90 = 3pm, ...
-odsimirus.sensor1.translation = (1.0;-1.0;0.0)  # Translation (X;Y;Z) w.r.t. vehicle's center
+odsimirus.sensor1.rotZ = -20                    # Rotation of the sensor around the Z-axis in degrees, positive = counterclockwise, negative = clockwise, 0 = 12am, -90 = 3pm, ...
+odsimirus.sensor1.translation = (2.0;-1.0;0.0)  # Translation (X;Y;Z) w.r.t. vehicle's center
 odsimirus.sensor1.angleFOV = 20                 # In degrees.
 odsimirus.sensor1.distanceFOV = 20              # In meters.
 odsimirus.sensor1.clampDistance = 19            # Any distances greater than this distance will be ignored and -1 will be returned.
@@ -98,8 +98,8 @@ odsimirus.sensor1.showFOV = 1                   # Show FOV in monitor.
 
 odsimirus.sensor2.id = 2                        # This ID is used in SensorBoardData structure.
 odsimirus.sensor2.name = UltraSonic_FrontLeft   # Name of the sensor
-odsimirus.sensor2.rotZ = 30                     # Rotation of the sensor around the Z-axis in degrees, positive = counterclockwise, negative = clockwise, 0 = 12am, -90 = 3pm, ...
-odsimirus.sensor2.translation = (1.0;1.0;0.0) # Translation (X;Y;Z) w.r.t. vehicle's center
+odsimirus.sensor2.rotZ = 20                     # Rotation of the sensor around the Z-axis in degrees, positive = counterclockwise, negative = clockwise, 0 = 12am, -90 = 3pm, ...
+odsimirus.sensor2.translation = (2.0;1.0;0.0)   # Translation (X;Y;Z) w.r.t. vehicle's center
 odsimirus.sensor2.angleFOV = 20                 # In degrees.
 odsimirus.sensor2.distanceFOV = 20              # In meters.
 odsimirus.sensor2.clampDistance = 19            # Any distances greater than this distance will be ignored and -1 will be returned.
@@ -110,18 +110,18 @@ odsimirus.sensor2.showFOV = 1                   # Show FOV in monitor.
 #odsimirus.sensor1.rotZ = -180                   # Rotation of the sensor around the Z-axis in degrees, positive = counterclockwise, negative = clockwise, 0 = 12am, -90 = 3pm, ...
 #odsimirus.sensor1.translation = (-1.0;0.0;0.0)  # Translation (X;Y;Z) w.r.t. vehicle's center
 #odsimirus.sensor1.angleFOV = 5                  # In degrees.
-#odsimirus.sensor1.distanceFOV = 30               # In meters.
+#odsimirus.sensor1.distanceFOV = 30              # In meters.
 #odsimirus.sensor1.clampDistance = 2.9           # Any distances greater than this distance will be ignored and -1 will be returned.
 #odsimirus.sensor1.showFOV = 1                   # Show FOV in monitor.
 #
-#odsimirus.sensor2.id = 2                        # This ID is used in SensorBoardData structure.
-#odsimirus.sensor2.name = Infrared_RearRight     # Name of the sensor
-#odsimirus.sensor2.rotZ = -90                    # Rotation of the sensor around the Z-axis in degrees, positive = counterclockwise, negative = clockwise, 0 = 12am, -90 = 3pm, ...
-#odsimirus.sensor2.translation = (-1.0;-1.0;0.0) # Translation (X;Y;Z) w.r.t. vehicle's center
-#odsimirus.sensor2.angleFOV = 5                  # In degrees.
-#odsimirus.sensor2.distanceFOV = 3               # In meters.
-#odsimirus.sensor2.clampDistance = 2.9           # Any distances greater than this distance will be ignored and -1 will be returned.
-#odsimirus.sensor2.showFOV = 1                   # Show FOV in monitor.
+odsimirus.sensor3.id = 3                        # This ID is used in SensorBoardData structure.
+odsimirus.sensor3.name = Infrared_FrontRight    # Name of the sensor
+odsimirus.sensor3.rotZ = -90                    # Rotation of the sensor around the Z-axis in degrees, positive = counterclockwise, negative = clockwise, 0 = 12am, -90 = 3pm, ...
+odsimirus.sensor3.translation = (1.5;-1.0;0.0) # Translation (X;Y;Z) w.r.t. vehicle's center
+odsimirus.sensor3.angleFOV = 5                  # In degrees.
+odsimirus.sensor3.distanceFOV = 4               # In meters.
+odsimirus.sensor3.clampDistance = 3.9           # Any distances greater than this distance will be ignored and -1 will be returned.
+odsimirus.sensor3.showFOV = 1                   # Show FOV in monitor.
 #
 ##odsimirus.sensor3.id = 3                        # This ID is used in SensorBoardData structure.
 #odsimirus.sensor3.name = UltraSonic_FrontCenter # Name of the sensor
