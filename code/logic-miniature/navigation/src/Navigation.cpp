@@ -111,9 +111,11 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     
     // Constant definintions
     float const MAX_VOLTAGE = 1.8;
-    float const IR_MAX_DISTANCE = 40;
-    float const SONIC_MAX_DISTANCE = 40;
-
+    float const MAX_DISTANCE = 40;//All sensors have the same max distance
+                                  //in the code due to the way the 
+                                  //ConvertSensorToAnalogReading function 
+                                  //in Differential.cpp works.
+                                  
     uint32_t const PWM_NEUTRAL = 1500000;
     uint32_t const PWM_MAX = 2000000;
     uint32_t const PWM_MIN = 1000000;
@@ -125,10 +127,10 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     float voltageLeftSonic = m_analogReadings[2];
     float voltageRightIR= m_analogReadings[3];
 
-    float distanceMiddleIR = (voltageMiddleIR/MAX_VOLTAGE)*IR_MAX_DISTANCE;
-    float distanceRightSonic = (voltageRightSonic/MAX_VOLTAGE)*SONIC_MAX_DISTANCE;
-    float distanceLeftSonic = (voltageLeftSonic/MAX_VOLTAGE)*SONIC_MAX_DISTANCE;
-    float distanceRightIR = (voltageRightIR/MAX_VOLTAGE)*IR_MAX_DISTANCE;
+    float distanceMiddleIR = (voltageMiddleIR/MAX_VOLTAGE)*MAX_DISTANCE;
+    float distanceRightSonic = (voltageRightSonic/MAX_VOLTAGE)*MAX_DISTANCE;
+    float distanceLeftSonic = (voltageLeftSonic/MAX_VOLTAGE)*MAX_DISTANCE;
+    float distanceRightIR = (voltageRightIR/MAX_VOLTAGE)*MAX_DISTANCE;
 
     std::cout << "Distance middle infrared: " << distanceMiddleIR << std::endl;
     std::cout << "Distance right sonic: " << distanceRightSonic << std::endl;
@@ -142,13 +144,12 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     if(m_currentState == State::cruise)
     {
-
       // Go forward
       leftOutputPWM = PWM_NEUTRAL + PWM_STEP;
       rightOutputPWM = PWM_NEUTRAL + PWM_STEP;
 
-      // Check if need to avoid
-      if(distanceMiddleIR < 3 || distanceRightSonic < 2 || distanceLeftSonic < 2)
+      // Check if there is a need to avoid
+      if(distanceMiddleIR<3 || distanceRightSonic<2 || distanceLeftSonic<2)
       {
         if((std::rand() % 5) == 0 && distanceRightSonic < distanceLeftSonic)
         {
@@ -157,8 +158,10 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
           int minTime = 20;
           int maxTime = 40;
           int timeScale = 1;
-
-          m_stateTimeout = ((std::rand() % (maxTime-minTime)*timeScale) + minTime*timeScale)/timeScale; 
+          // Random time between minTime and maxTime seconds
+          // with (1/timeScale) second steps
+          m_stateTimeout = ((std::rand() % (maxTime-minTime)*timeScale)
+                           + minTime*timeScale)/timeScale; 
           m_stateTimer = 0;
         }
         else
@@ -167,28 +170,30 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
           {
             if(distanceRightIR > 3)
             {
-              m_currentState = State::avoidRight;
+              m_currentState = State::turnRight;
             }
             else
             {
-              m_currentState = State::avoidLeft;
+              m_currentState = State::turnLeft;
             }
           }
           else if(distanceRightSonic < distanceLeftSonic)
           {
-            m_currentState = State::avoidLeft;
+            m_currentState = State::turnLeft;
           }
           else
           {
-            m_currentState = State::avoidRight;
+            m_currentState = State::turnRight;
           }
 
           int minTime = 0.5;
           int maxTime = 2;
           int timeScale = 5;
-          // Random time between minTime and maxTime seconds with (1/timeScale) second steps
-          m_stateTimeout = ((std::rand() % (maxTime-minTime)*timeScale) + minTime*timeScale)/timeScale; 
-          m_stateTimer = 0;
+          // Random time between minTime and maxTime seconds
+          // with (1/timeScale) second steps
+          m_stateTimeout = ((std::rand() % (maxTime-minTime)*timeScale)
+                           + minTime*timeScale)/timeScale; 
+         m_stateTimer = 0;
         }
       }
     }
@@ -205,13 +210,14 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       }
       else
       {
-        controlSignal = (float)-0.65*PWM_STEP;
+        controlSignal = (float)-0.65*PWM_STEP; //Turn towards the right wall
       }
 
       leftOutputPWM = PWM_NEUTRAL + PWM_STEP - controlSignal;
       rightOutputPWM = PWM_NEUTRAL + PWM_STEP + controlSignal;
 
 
+      // Check if a wall in front of the robot should be avoided
       if(distanceMiddleIR < 3 || distanceRightSonic < 2)
       {
         leftOutputPWM = PWM_NEUTRAL;
@@ -224,7 +230,8 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       }
     }
 
-    if(m_currentState == State::avoidLeft)
+
+    if(m_currentState == State::turnLeft)
     {
       leftOutputPWM = PWM_NEUTRAL - 0.3*PWM_STEP;
       rightOutputPWM = PWM_NEUTRAL + PWM_STEP;
@@ -235,7 +242,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       }
     }
 
-    if(m_currentState == State::avoidRight)
+    if(m_currentState == State::turnRight)
     {
       leftOutputPWM = PWM_NEUTRAL + PWM_STEP;
       rightOutputPWM = PWM_NEUTRAL - 0.3*PWM_STEP;
@@ -256,36 +263,15 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     m_stateTimer += m_deltaTime;
 
-    // Loop through all General Purpose IO (GPIO) pins and randomize their 
-    // state. The state is then sent as a message to the module interfacing
-    // to the actual hardware.
-    //for (auto pin : m_gpioOutputPins) {
-    //  bool value = static_cast<bool>(std::rand() % 2);
 
-    //  opendlv::proxy::ToggleRequest::ToggleState state;
-    //  if (value) {
-    //    state = opendlv::proxy::ToggleRequest::On;
-    //  } else {
-    //    state = opendlv::proxy::ToggleRequest::Off;
-    //  }
-
-    //  opendlv::proxy::ToggleRequest request(pin, state);
-    //  
-    //  odcore::data::Container c(request);
-    //  getConference().send(c);
-    //  
-    //  std::cout << "[" << getName() << "] Sending ToggleRequest: " 
-    //      << request.toString() << std::endl;
-    //}
-
-    // Send output signals to the motors
-
+    // Restrict output signals
     if(leftOutputPWM > PWM_MAX) leftOutputPWM = PWM_MAX;
     else if(leftOutputPWM < PWM_MIN) leftOutputPWM = PWM_MIN;
 
     if(rightOutputPWM > PWM_MAX) rightOutputPWM = PWM_MAX;
     else if(rightOutputPWM < PWM_MIN) rightOutputPWM = PWM_MIN;
 
+    // Send output signals to the motors
     uint16_t leftWheelPin = 0;
     uint16_t rightWheelPin = 1;
 
@@ -298,26 +284,6 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     getConference().send(cL);
     getConference().send(cR);
 
-    // Loop through all Pulse Width Modulation (PWM) pins and randomize their 
-    // value. The value is then sent as a message to the module interfacing
-    // to the actual hardware.
-    //for (auto pin : m_pwmOutputPins) {
-    //  int32_t rand = (std::rand() % 11) - 5 ;
-    //  uint32_t value = 1500000 + rand * 100000;
-    //  
-    //  opendlv::proxy::PwmRequest request(pin, value);
-    //  
-    //  odcore::data::Container c(request);
-    //  getConference().send(c);
-    //  
-    //  std::cout << "[" << getName() << "] Sending PwmRequest: " 
-    //      << request.toString() << std::endl;
-    //}
-
-    ///// Example above.
-
-    ///// TODO: Add proper behaviours.
-    //std::cout << "TODO: Add proper behaviour." << std::endl;
   }
   return odcore::data::dmcp::ModuleExitCodeMessage::OKAY;
 }

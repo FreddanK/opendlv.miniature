@@ -49,10 +49,7 @@ class Navigation :
   std::vector<uint16_t> m_gpioOutputPins;
   std::vector<uint16_t> m_pwmOutputPins;
 
-  //enum class Process {avoid, wallFollow, stop, cruise}; 
-  //enum class AvoidState {turnLeft, avoidRight};
-  //enum class WallFollowState {follow, avoidLeft, avoidRight};
-  enum class State {cruise, wallFollow, avoidLeft, avoidRight, stop};
+  enum class State {cruise, wallFollow, turnLeft, turnRight, stop};
   double m_stateTimer;
   double m_stateTimeout;
   double m_deltaTime;

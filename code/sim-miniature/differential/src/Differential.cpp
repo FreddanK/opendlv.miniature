@@ -44,7 +44,6 @@ Differential::Differential(const int &argc, char **argv)
   , m_deltaTime()
   , m_leftWheelAngularVelocity(0.0)
   , m_rightWheelAngularVelocity(0.0)
-  , m_globalTime(0.0)
 {
 }
 
@@ -131,8 +130,10 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
     double const radiusWheel = 0.06; // (m)
 
     // Kinematic equations below
-    double bodyVelocity = radiusWheel*(m_leftWheelAngularVelocity + m_rightWheelAngularVelocity)/2;
-    double yawRate = -radiusWheel*(m_leftWheelAngularVelocity - m_rightWheelAngularVelocity)/(2*radiusBody); 
+    double bodyVelocity = radiusWheel*(m_leftWheelAngularVelocity 
+                            + m_rightWheelAngularVelocity)/2;
+    double yawRate = -radiusWheel*(m_leftWheelAngularVelocity 
+                        - m_rightWheelAngularVelocity)/(2*radiusBody); 
 
     // Integrate yawRate so that yaw can be used to calculate velX and velY
     double yaw = prevYaw + yawRate*m_deltaTime; 
@@ -145,8 +146,6 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
     double posX = prevPosX + velX*m_deltaTime; 
     double posY = prevPosY + velY*m_deltaTime; 
     
-    m_globalTime = m_globalTime + m_deltaTime;
-
     // Due to a simulation scaling problem, the position is scaled. 
     // NOTE: Do not change the code below.
     posX = posX * 10.0;
