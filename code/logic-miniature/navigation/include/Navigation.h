@@ -24,6 +24,7 @@
 
 #include <opendavinci/odcore/base/Mutex.h>
 #include <opendavinci/odcore/base/module/TimeTriggeredConferenceClientModule.h>
+#include "opendavinci/odcore/data/TimeStamp.h"
 
 namespace opendlv {
 namespace logic {
@@ -49,11 +50,8 @@ class Navigation :
   std::vector<uint16_t> m_gpioOutputPins;
   std::vector<uint16_t> m_pwmOutputPins;
 
-  enum class State {cruise, wallFollow, turnLeft, turnRight, stop};
-  double m_stateTimer;
-  double m_stateTimeout;
-  double m_deltaTime;
-  State m_currentState;
+  double m_pruReading;
+  odcore::data::TimeStamp m_sonarDetectionTime;
 };
 
 }

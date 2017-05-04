@@ -43,10 +43,8 @@ Navigation::Navigation(const int &argc, char **argv)
     , m_gpioReadings()
     , m_gpioOutputPins()
     , m_pwmOutputPins()
-    , m_stateTimer(0.0)
-    , m_stateTimeout(2.0)
-    , m_deltaTime()
-    , m_currentState(State::stop)
+    , m_pruReading()
+    , m_sonarDetectionTime()
 {
 }
 
@@ -81,8 +79,6 @@ void Navigation::setUp()
   for (auto pin : pwmPinsVector) {
     m_pwmOutputPins.push_back(std::stoi(pin));
   }
-
-  m_deltaTime = 1 / getFrequency();
 }
 
 /*
@@ -106,187 +102,156 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     // The mutex is required since 'body' and 'nextContainer' competes by
     // reading and writing to the class global maps, see also 'nextContainer'.
     odcore::base::Lock l(m_mutex);
+		 //wait for sensors to read correct values.
+				//set PWM signals.
+		
 
-    //// Example below.
-    
-    // Constant definintions
-    float const MAX_VOLTAGE = 1.8;
-    float const MAX_DISTANCE = 40;//All sensors have the same max distance
-                                  //in the code due to the way the 
-                                  //ConvertSensorToAnalogReading function 
-                                  //in Differential.cpp works.
-                                  
-    uint32_t const PWM_NEUTRAL = 1500000;
-    uint32_t const PWM_MAX = 2000000;
-    uint32_t const PWM_MIN = 1000000;
-    uint32_t const PWM_STEP = 250000;
+			uint32_t value1 = 45000;
+			uint32_t value2 = 45000;	
 
-    // Read sensors
-    float voltageMiddleIR = m_analogReadings[0];
-    float voltageRightSonic = m_analogReadings[1];
-    float voltageLeftSonic = m_analogReadings[2];
-    float voltageRightIR= m_analogReadings[3];
+			uint32_t value4 = 13157;
+			opendlv::proxy::PwmRequest request4(0, value4);
+			odcore::data::Container c4(request4);
+			uint32_t stamp4 = 3;
+			c4.setSenderStamp(stamp4);
+			getConference().send(c4);
+			
+//			double voltageReadingPin0 = m_analogReadings[0];
+//			double voltageReadingPin1 = m_analogReadings[1];
+			
+			//double voltageReadingPin1 = m_analogReadings[1];
+//      std::cout << "Voltage reading 0: " << voltageReadingPin0 << std::endl;		
+//			std::cout << "Voltage reading 1: " << voltageReadingPin1 << std::endl;		
+	
 
-    float distanceMiddleIR = (voltageMiddleIR/MAX_VOLTAGE)*MAX_DISTANCE;
-    float distanceRightSonic = (voltageRightSonic/MAX_VOLTAGE)*MAX_DISTANCE;
-    float distanceLeftSonic = (voltageLeftSonic/MAX_VOLTAGE)*MAX_DISTANCE;
-    float distanceRightIR = (voltageRightIR/MAX_VOLTAGE)*MAX_DISTANCE;
+		odcore::data::TimeStamp now;
+		if (m_pruReading < 30.0) {
+			m_sonarDetectionTime = now;
+		}
+		double timeSinceLastSonarDetection = static_cast<double>(now.toMicroseconds() - m_sonarDetectionTime.toMicroseconds()) / 1000000.0;
 
-    std::cout << "Distance middle infrared: " << distanceMiddleIR << std::endl;
-    std::cout << "Distance right sonic: " << distanceRightSonic << std::endl;
-    std::cout << "Distance left sonic: " << distanceLeftSonic << std::endl;
-    std::cout << "Distance right infrared: " << distanceRightIR << std::endl;
+		opendlv::proxy::ToggleRequest::ToggleState stateOn = opendlv::proxy::ToggleRequest::On;
+		opendlv::proxy::ToggleRequest::ToggleState stateOff = opendlv::proxy::ToggleRequest::Off;
 
+		std::cout << "Sonar sensor reading: " << m_pruReading << ", with time stamp: " << timeSinceLastSonarDetection << std::endl;
 
-    // Stand still by default
-    uint32_t leftOutputPWM = PWM_NEUTRAL;
-    uint32_t rightOutputPWM = PWM_NEUTRAL;
+		if (timeSinceLastSonarDetection < 1.5) {	
+			std::cout << "Backing..." << std::endl;
+			value1 = 0;
+			value2 = 0;
 
-    if(m_currentState == State::cruise)
-    {
-      // Go forward
-      leftOutputPWM = PWM_NEUTRAL + PWM_STEP;
-      rightOutputPWM = PWM_NEUTRAL + PWM_STEP;
+		//	opendlv::proxy::ToggleRequest request30(30, stateOff);
+		//	opendlv::proxy::ToggleRequest request31(31, stateOn);
+		//	opendlv::proxy::ToggleRequest request51(51, stateOff);
+		//	opendlv::proxy::ToggleRequest request60(60, stateOn);
 
-      // Check if there is a need to avoid
-      if(distanceMiddleIR<3 || distanceRightSonic<2 || distanceLeftSonic<2)
-      {
-        if((std::rand() % 5) == 0 && distanceRightSonic < distanceLeftSonic)
-        {
-          m_currentState = State::wallFollow;
+		//	odcore::data::Container c30(request30);
+		//	odcore::data::Container c31(request31);
+		//	odcore::data::Container c51(request51);
+		//	odcore::data::Container c60(request60);
 
-          int minTime = 20;
-          int maxTime = 40;
-          int timeScale = 1;
-          // Random time between minTime and maxTime seconds
-          // with (1/timeScale) second steps
-          m_stateTimeout = ((std::rand() % (maxTime-minTime)*timeScale)
-                           + minTime*timeScale)/timeScale; 
-          m_stateTimer = 0;
-        }
-        else
-        {
-          if(abs(distanceRightSonic - distanceLeftSonic) < 1)
-          {
-            if(distanceRightIR > 3)
-            {
-              m_currentState = State::turnRight;
-            }
-            else
-            {
-              m_currentState = State::turnLeft;
-            }
-          }
-          else if(distanceRightSonic < distanceLeftSonic)
-          {
-            m_currentState = State::turnLeft;
-          }
-          else
-          {
-            m_currentState = State::turnRight;
-          }
+		//	getConference().send(c30);
+		//	getConference().send(c31);
+		//	getConference().send(c51);
+		//	getConference().send(c60);
+		} else if (timeSinceLastSonarDetection < 3.0) {
+			std::cout << "Turning..." << std::endl;
+			value1 = 40000;
+			value2 = 40000;
 
-          int minTime = 0.5;
-          int maxTime = 2;
-          int timeScale = 5;
-          // Random time between minTime and maxTime seconds
-          // with (1/timeScale) second steps
-          m_stateTimeout = ((std::rand() % (maxTime-minTime)*timeScale)
-                           + minTime*timeScale)/timeScale; 
-         m_stateTimer = 0;
-        }
-      }
-    }
+			opendlv::proxy::ToggleRequest request30(30, stateOn);
+			opendlv::proxy::ToggleRequest request31(31, stateOff);
+			opendlv::proxy::ToggleRequest request51(51, stateOff);
+			opendlv::proxy::ToggleRequest request60(60, stateOn);
 
-    if(m_currentState == State::wallFollow)
-    {
-      float targetWallDistance = 2;
-      int controlSignal = 0;
+			odcore::data::Container c30(request30);
+			odcore::data::Container c31(request31);
+			odcore::data::Container c51(request51);
+			odcore::data::Container c60(request60);
 
-      if(distanceRightIR < 3)
-      {
-        float error = targetWallDistance - distanceRightIR;
-        controlSignal = (float)0.4*error*PWM_STEP;
-      }
-      else
-      {
-        controlSignal = (float)-0.65*PWM_STEP; //Turn towards the right wall
-      }
+			getConference().send(c30);
+			getConference().send(c31);
+			getConference().send(c51);
+			getConference().send(c60);
+		} else {
+			std::cout << "Moving forward..." << std::endl;
+			value1 = 40000;
+			value2 = 40000;
 
-      leftOutputPWM = PWM_NEUTRAL + PWM_STEP - controlSignal;
-      rightOutputPWM = PWM_NEUTRAL + PWM_STEP + controlSignal;
+			opendlv::proxy::ToggleRequest request30(30, stateOn);
+			opendlv::proxy::ToggleRequest request31(31, stateOff);
+			opendlv::proxy::ToggleRequest request51(51, stateOn);
+			opendlv::proxy::ToggleRequest request60(60, stateOff);
 
+			odcore::data::Container c30(request30);
+			odcore::data::Container c31(request31);
+			odcore::data::Container c51(request51);
+			odcore::data::Container c60(request60);
 
-      // Check if a wall in front of the robot should be avoided
-      if(distanceMiddleIR < 3 || distanceRightSonic < 2)
-      {
-        leftOutputPWM = PWM_NEUTRAL;
-        rightOutputPWM = PWM_NEUTRAL + PWM_STEP;
-      }
+			getConference().send(c30);
+			getConference().send(c31);
+			getConference().send(c51);
+			getConference().send(c60);
+		}
+		
+		
+/*
+		if(voltageReadingPin0 < 2000 && stop)
+		{
+			uint32_t value1 = 45000;
+			opendlv::proxy::PwmRequest request1(0, value1);
+			odcore::data::Container c1(request1);
+			uint32_t stamp1 = 1;
+			c1.setSenderStamp(stamp1);
+			getConference().send(c1);
 
-      if(m_stateTimer > m_stateTimeout) 
-      {
-        m_currentState = State::cruise;
-      }
-    }
+			uint32_t value2 = 45000;
+			opendlv::proxy::PwmRequest request2(0, value2);
+			odcore::data::Container c2(request2);
+			uint32_t stamp2 = 2;
+			c2.setSenderStamp(stamp2);
+			getConference().send(c2);
+			start = true;
+		}
+		else if(m_pruReading < 50 && start)		
+		{
+			uint32_t value1 = 25000;
+			opendlv::proxy::PwmRequest request1(0, value1);
+			odcore::data::Container c1(request1);
+			uint32_t stamp1 = 1;
+			c1.setSenderStamp(stamp1);
+			getConference().send(c1);
 
+			uint32_t value2 = 25000;
+			opendlv::proxy::PwmRequest request2(0, value2);
+			odcore::data::Container c2(request2);
+			uint32_t stamp2 = 2;
+			c2.setSenderStamp(stamp2);
+			getConference().send(c2);
+			
+			stop = true;
+		}
+*/
 
-    if(m_currentState == State::turnLeft)
-    {
-      leftOutputPWM = PWM_NEUTRAL - 0.3*PWM_STEP;
-      rightOutputPWM = PWM_NEUTRAL + PWM_STEP;
+		//i = i + 50;
+		//if(i == 20000){i = 0;}
+	
+			opendlv::proxy::PwmRequest request1(0, value1);
+			odcore::data::Container c1(request1);
+			uint32_t stamp1 = 1;
+			c1.setSenderStamp(stamp1);
+			getConference().send(c1);
 
-      if(m_stateTimer > m_stateTimeout) 
-      {
-        m_currentState = State::cruise;
-      }
-    }
-
-    if(m_currentState == State::turnRight)
-    {
-      leftOutputPWM = PWM_NEUTRAL + PWM_STEP;
-      rightOutputPWM = PWM_NEUTRAL - 0.3*PWM_STEP;
-
-      if(m_stateTimer > m_stateTimeout) 
-      {
-        m_currentState = State::cruise;
-      }
-    }
-
-    if(m_currentState == State::stop)
-    {
-      leftOutputPWM = PWM_NEUTRAL;
-      rightOutputPWM = PWM_NEUTRAL;
-
-      if(m_stateTimer > m_stateTimeout) m_currentState = State::cruise;
-    }
-
-    m_stateTimer += m_deltaTime;
-
-
-    // Restrict output signals
-    if(leftOutputPWM > PWM_MAX) leftOutputPWM = PWM_MAX;
-    else if(leftOutputPWM < PWM_MIN) leftOutputPWM = PWM_MIN;
-
-    if(rightOutputPWM > PWM_MAX) rightOutputPWM = PWM_MAX;
-    else if(rightOutputPWM < PWM_MIN) rightOutputPWM = PWM_MIN;
-
-    // Send output signals to the motors
-    uint16_t leftWheelPin = 0;
-    uint16_t rightWheelPin = 1;
-
-    opendlv::proxy::PwmRequest requestLeft(leftWheelPin,leftOutputPWM);
-    opendlv::proxy::PwmRequest requestRight(rightWheelPin,rightOutputPWM);
-
-    odcore::data::Container cL(requestLeft);
-    odcore::data::Container cR(requestRight);
-
-    getConference().send(cL);
-    getConference().send(cR);
-
+			opendlv::proxy::PwmRequest request2(0, value2);
+			odcore::data::Container c2(request2);
+			uint32_t stamp2 = 2;
+			c2.setSenderStamp(stamp2);
+			getConference().send(c2);
+		//	start = true;
   }
   return odcore::data::dmcp::ModuleExitCodeMessage::OKAY;
 }
+
 
 /* 
   This method receives messages from all other modules (in the same conference 
@@ -307,8 +272,8 @@ void Navigation::nextContainer(odcore::data::Container &a_c)
 
     m_analogReadings[pin] = voltage; // Save the input to the class global map.
 
-    std::cout << "[" << getName() << "] Received an AnalogReading: " 
-        << reading.toString() << "." << std::endl;
+    //std::cout << "[" << getName() << "] Received an AnalogReading: " 
+    //    << reading.toString() << "." << std::endl;
 
   } else if (dataType == opendlv::proxy::ToggleReading::ID()) {
     opendlv::proxy::ToggleReading reading = 
@@ -324,8 +289,15 @@ void Navigation::nextContainer(odcore::data::Container &a_c)
 
     m_gpioReadings[pin] = state; // Save the state to the class global map.
 
-    std::cout << "[" << getName() << "] Received a ToggleReading: "
-        << reading.toString() << "." << std::endl;
+    //std::cout << "[" << getName() << "] Received a ToggleReading: "
+    //    << reading.toString() << "." << std::endl;
+  } else if (dataType == opendlv::proxy::ProximityReading::ID()) {
+    opendlv::proxy::ProximityReading reading =
+      a_c.getData<opendlv::proxy::ProximityReading>();
+
+    double distance = reading.getProximity();
+
+    m_pruReading = distance;
   }
 }
 
