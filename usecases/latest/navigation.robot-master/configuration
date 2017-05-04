@@ -74,15 +74,21 @@ proxy-miniature-analog.pins = 0,1,2,3,4,5,6
 
 proxy-miniature-gpio.debug = 1
 proxy-miniature-gpio.systemPath = /sys/class/gpio
-proxy-miniature-gpio.pins = 30,31
-proxy-miniature-gpio.values = 0,1
-proxy-miniature-gpio.directions = in,out
+proxy-miniature-gpio.pins = 30,31,60,51
+proxy-miniature-gpio.values = 0,1,0,1
+proxy-miniature-gpio.directions = out,out,out,out
 
-proxy-miniature-pwm.debug = 1
-proxy-miniature-pwm.systemPath = /sys/class/pwm/pwmchip2
-proxy-miniature-pwm.pins = 0,1
-proxy-miniature-pwm.periodsNs = 20000000,20000000
-proxy-miniature-pwm.dutyCyclesNs = 1500000,1500000
+proxy-miniature-pwm:1.debug = 1
+proxy-miniature-pwm:1.systemPath = /sys/class/pwm/pwmchip0
+proxy-miniature-pwm:1.pins = 0
+proxy-miniature-pwm:1.periodsNs = 50000
+proxy-miniature-pwm:1.dutyCyclesNs = 25000
+
+proxy-miniature-pwm:2.debug = 1
+proxy-miniature-pwm:2.systemPath = /sys/class/pwm/pwmchip2
+proxy-miniature-pwm:2.pins = 0
+proxy-miniature-pwm:2.periodsNs = 50000
+proxy-miniature-pwm:2.dutyCyclesNs = 25000
 
 
 ###############################################################################
