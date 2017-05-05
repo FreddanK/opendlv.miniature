@@ -44,6 +44,11 @@ class Navigation :
   void tearDown();
   virtual odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode body();
 
+  enum Direction {forward, backward};
+
+  void sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMotorDutyCycle);
+  void sendGPIOCommands(Direction leftWheelDirection, Direction rightWheelDirection);
+
   odcore::base::Mutex m_mutex;
   std::map<uint16_t, float> m_analogReadings;
   std::map<uint16_t, bool> m_gpioReadings;
@@ -52,6 +57,13 @@ class Navigation :
 
   double m_pruReading;
   odcore::data::TimeStamp m_sonarDetectionTime;
+
+  uint32_t m_prevLeftMotorDutyCycle;
+  uint32_t m_prevRightMotorDutyCycle;
+  Direction m_prevLeftWheelDirection;
+  Direction m_prevRightWheelDirection;
+  
+
 };
 
 }

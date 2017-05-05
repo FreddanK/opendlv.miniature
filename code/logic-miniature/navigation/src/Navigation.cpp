@@ -45,6 +45,10 @@ Navigation::Navigation(const int &argc, char **argv)
     , m_pwmOutputPins()
     , m_pruReading()
     , m_sonarDetectionTime()
+    , m_prevLeftMotorDutyCycle(0)
+    , m_prevRightMotorDutyCycle(0)
+    , m_prevLeftWheelDirection(Direction::backward)
+    , m_prevRightWheelDirection(Direction::backward)
 {
 }
 
@@ -96,162 +100,149 @@ void Navigation::tearDown()
 */
 odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 {
+  uint32_t value4 = 13157;
+  opendlv::proxy::PwmRequest request4(0, value4);
+  odcore::data::Container c4(request4);
+  uint32_t stamp4 = 3;
+  c4.setSenderStamp(stamp4);
+  getConference().send(c4);
+
   while (getModuleStateAndWaitForRemainingTimeInTimeslice() == 
       odcore::data::dmcp::ModuleStateMessage::RUNNING) {
 
     // The mutex is required since 'body' and 'nextContainer' competes by
     // reading and writing to the class global maps, see also 'nextContainer'.
     odcore::base::Lock l(m_mutex);
-		 //wait for sensors to read correct values.
-				//set PWM signals.
-		
+    //wait for sensors to read correct values.
+    //set PWM signals.
 
-			uint32_t value1 = 45000;
-			uint32_t value2 = 45000;	
 
-			uint32_t value4 = 13157;
-			opendlv::proxy::PwmRequest request4(0, value4);
-			odcore::data::Container c4(request4);
-			uint32_t stamp4 = 3;
-			c4.setSenderStamp(stamp4);
-			getConference().send(c4);
-			
-//			double voltageReadingPin0 = m_analogReadings[0];
-//			double voltageReadingPin1 = m_analogReadings[1];
-			
-			//double voltageReadingPin1 = m_analogReadings[1];
-//      std::cout << "Voltage reading 0: " << voltageReadingPin0 << std::endl;		
-//			std::cout << "Voltage reading 1: " << voltageReadingPin1 << std::endl;		
-	
+    // Defalt duty cycles
+    uint32_t leftMotorDutyCycle = 45000;
+    uint32_t rightMotorDutyCycle = 45000;	
+    // Default directions
+    Direction leftWheelDirection = Direction::forward;
+    Direction rightWheelDirection = Direction::forward;
 
-		odcore::data::TimeStamp now;
-		if (m_pruReading < 30.0) {
-			m_sonarDetectionTime = now;
-		}
-		double timeSinceLastSonarDetection = static_cast<double>(now.toMicroseconds() - m_sonarDetectionTime.toMicroseconds()) / 1000000.0;
 
-		opendlv::proxy::ToggleRequest::ToggleState stateOn = opendlv::proxy::ToggleRequest::On;
-		opendlv::proxy::ToggleRequest::ToggleState stateOff = opendlv::proxy::ToggleRequest::Off;
+    odcore::data::TimeStamp now;
 
-		std::cout << "Sonar sensor reading: " << m_pruReading << ", with time stamp: " << timeSinceLastSonarDetection << std::endl;
+    // Check for collision
+    if (m_pruReading < 30.0) {
+      m_sonarDetectionTime = now;
+    }
 
-		if (timeSinceLastSonarDetection < 1.5) {	
-			std::cout << "Backing..." << std::endl;
-			value1 = 0;
-			value2 = 0;
+    double timeSinceLastSonarDetection = static_cast<double>(now.toMicroseconds() - m_sonarDetectionTime.toMicroseconds()) / 1000000.0;
 
-		//	opendlv::proxy::ToggleRequest request30(30, stateOff);
-		//	opendlv::proxy::ToggleRequest request31(31, stateOn);
-		//	opendlv::proxy::ToggleRequest request51(51, stateOff);
-		//	opendlv::proxy::ToggleRequest request60(60, stateOn);
+    std::cout << "Sonar sensor reading: " << m_pruReading << ", with time stamp: " << timeSinceLastSonarDetection << std::endl;
 
-		//	odcore::data::Container c30(request30);
-		//	odcore::data::Container c31(request31);
-		//	odcore::data::Container c51(request51);
-		//	odcore::data::Container c60(request60);
+    if (timeSinceLastSonarDetection < 1.5) {	
+      std::cout << "Backing..." << std::endl;
+      leftMotorDutyCycle = 40000;
+      rightMotorDutyCycle = 40000;
+      leftWheelDirection = Direction::backward;
+      rightWheelDirection = Direction::backward;
 
-		//	getConference().send(c30);
-		//	getConference().send(c31);
-		//	getConference().send(c51);
-		//	getConference().send(c60);
-		} else if (timeSinceLastSonarDetection < 3.0) {
-			std::cout << "Turning..." << std::endl;
-			value1 = 40000;
-			value2 = 40000;
+    } else if (timeSinceLastSonarDetection < 3.0) {
+      std::cout << "Turning..." << std::endl;
+      leftMotorDutyCycle = 40000;
+      rightMotorDutyCycle = 40000;
+      leftWheelDirection = Direction::backward;
+      rightWheelDirection = Direction::forward;
 
-			opendlv::proxy::ToggleRequest request30(30, stateOn);
-			opendlv::proxy::ToggleRequest request31(31, stateOff);
-			opendlv::proxy::ToggleRequest request51(51, stateOff);
-			opendlv::proxy::ToggleRequest request60(60, stateOn);
+    } else {
+      std::cout << "Moving forward..." << std::endl;
+      leftMotorDutyCycle = 40000;
+      rightMotorDutyCycle = 40000;
+      leftWheelDirection = Direction::forward;
+      rightWheelDirection = Direction::forward;
+    }
 
-			odcore::data::Container c30(request30);
-			odcore::data::Container c31(request31);
-			odcore::data::Container c51(request51);
-			odcore::data::Container c60(request60);
-
-			getConference().send(c30);
-			getConference().send(c31);
-			getConference().send(c51);
-			getConference().send(c60);
-		} else {
-			std::cout << "Moving forward..." << std::endl;
-			value1 = 40000;
-			value2 = 40000;
-
-			opendlv::proxy::ToggleRequest request30(30, stateOn);
-			opendlv::proxy::ToggleRequest request31(31, stateOff);
-			opendlv::proxy::ToggleRequest request51(51, stateOn);
-			opendlv::proxy::ToggleRequest request60(60, stateOff);
-
-			odcore::data::Container c30(request30);
-			odcore::data::Container c31(request31);
-			odcore::data::Container c51(request51);
-			odcore::data::Container c60(request60);
-
-			getConference().send(c30);
-			getConference().send(c31);
-			getConference().send(c51);
-			getConference().send(c60);
-		}
-		
-		
-/*
-		if(voltageReadingPin0 < 2000 && stop)
-		{
-			uint32_t value1 = 45000;
-			opendlv::proxy::PwmRequest request1(0, value1);
-			odcore::data::Container c1(request1);
-			uint32_t stamp1 = 1;
-			c1.setSenderStamp(stamp1);
-			getConference().send(c1);
-
-			uint32_t value2 = 45000;
-			opendlv::proxy::PwmRequest request2(0, value2);
-			odcore::data::Container c2(request2);
-			uint32_t stamp2 = 2;
-			c2.setSenderStamp(stamp2);
-			getConference().send(c2);
-			start = true;
-		}
-		else if(m_pruReading < 50 && start)		
-		{
-			uint32_t value1 = 25000;
-			opendlv::proxy::PwmRequest request1(0, value1);
-			odcore::data::Container c1(request1);
-			uint32_t stamp1 = 1;
-			c1.setSenderStamp(stamp1);
-			getConference().send(c1);
-
-			uint32_t value2 = 25000;
-			opendlv::proxy::PwmRequest request2(0, value2);
-			odcore::data::Container c2(request2);
-			uint32_t stamp2 = 2;
-			c2.setSenderStamp(stamp2);
-			getConference().send(c2);
-			
-			stop = true;
-		}
-*/
-
-		//i = i + 50;
-		//if(i == 20000){i = 0;}
-	
-			opendlv::proxy::PwmRequest request1(0, value1);
-			odcore::data::Container c1(request1);
-			uint32_t stamp1 = 1;
-			c1.setSenderStamp(stamp1);
-			getConference().send(c1);
-
-			opendlv::proxy::PwmRequest request2(0, value2);
-			odcore::data::Container c2(request2);
-			uint32_t stamp2 = 2;
-			c2.setSenderStamp(stamp2);
-			getConference().send(c2);
-		//	start = true;
+    sendMotorCommands(leftMotorDutyCycle, rightMotorDutyCycle);
+    sendGPIOCommands(leftWheelDirection, rightWheelDirection);
   }
   return odcore::data::dmcp::ModuleExitCodeMessage::OKAY;
 }
 
+void Navigation::sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMotorDutyCycle)
+{
+  if(leftMotorDutyCycle != m_prevLeftMotorDutyCycle)
+  {
+    opendlv::proxy::PwmRequest request1(0, leftMotorDutyCycle);
+    odcore::data::Container c1(request1);
+    uint32_t stamp1 = 1;
+    c1.setSenderStamp(stamp1);
+    getConference().send(c1);
+
+    m_prevLeftMotorDutyCycle = leftMotorDutyCycle;
+  }
+
+  if(rightMotorDutyCycle != m_prevRightMotorDutyCycle)
+  {
+    opendlv::proxy::PwmRequest request2(0, rightMotorDutyCycle);
+    odcore::data::Container c2(request2);
+    uint32_t stamp2 = 2;
+    c2.setSenderStamp(stamp2);
+    getConference().send(c2);
+
+    m_prevRightMotorDutyCycle = rightMotorDutyCycle;
+  }
+}
+
+void Navigation::sendGPIOCommands(Direction leftWheelDirection, Direction rightWheelDirection)
+{
+  opendlv::proxy::ToggleRequest::ToggleState stateOn = opendlv::proxy::ToggleRequest::On;
+  opendlv::proxy::ToggleRequest::ToggleState stateOff = opendlv::proxy::ToggleRequest::Off;
+
+
+  if(leftWheelDirection != m_prevLeftWheelDirection)
+  {
+    m_prevLeftWheelDirection = leftWheelDirection;
+    if(leftWheelDirection == Direction::forward)
+    {
+      opendlv::proxy::ToggleRequest request30(30, stateOn);
+      odcore::data::Container c30(request30);
+      getConference().send(c30);
+
+      opendlv::proxy::ToggleRequest request31(31, stateOff);
+      odcore::data::Container c31(request31);
+      getConference().send(c31);
+    }
+    else
+    {
+      opendlv::proxy::ToggleRequest request30(30, stateOff);
+      odcore::data::Container c30(request30);
+      getConference().send(c30);
+
+      opendlv::proxy::ToggleRequest request31(31, stateOn);
+      odcore::data::Container c31(request31);
+      getConference().send(c31);
+    }
+  }
+
+  if(rightWheelDirection != m_prevRightWheelDirection)
+  {
+    m_prevRightWheelDirection = rightWheelDirection;
+    if(rightWheelDirection == Direction::forward)
+    {
+      opendlv::proxy::ToggleRequest request51(51, stateOn);
+      odcore::data::Container c51(request51);
+      getConference().send(c51);
+      opendlv::proxy::ToggleRequest request60(60, stateOff);
+      odcore::data::Container c60(request60);
+      getConference().send(c60);
+    }
+    else
+    {
+      opendlv::proxy::ToggleRequest request51(51, stateOff);
+      odcore::data::Container c51(request51);
+      getConference().send(c51);
+      opendlv::proxy::ToggleRequest request60(60, stateOn);
+      odcore::data::Container c60(request60);
+      getConference().send(c60);
+    }
+  }
+}
 
 /* 
   This method receives messages from all other modules (in the same conference 
