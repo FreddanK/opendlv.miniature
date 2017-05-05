@@ -158,6 +158,14 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       rightWheelDirection = Direction::forward;
     }
 
+    // Check if robot slave is initialized
+    double initialSensorReading = 0.0;
+    if(!(m_pruReading > initialSensorReading))
+    {
+      leftMotorDutyCycle = 0;
+      rightMotorDutyCycle = 0;
+    }
+
     sendMotorCommands(leftMotorDutyCycle, rightMotorDutyCycle);
     sendGPIOCommands(leftWheelDirection, rightWheelDirection);
   }
@@ -166,6 +174,9 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
 void Navigation::sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMotorDutyCycle)
 {
+    std::cout << "Pwm left motor: " << leftMotorDutyCycle << std::endl;
+    std::cout << "Pwm right motor: " << rightMotorDutyCycle << std::endl;
+
   if(leftMotorDutyCycle != m_prevLeftMotorDutyCycle)
   {
     opendlv::proxy::PwmRequest request1(0, leftMotorDutyCycle);
@@ -175,6 +186,7 @@ void Navigation::sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMo
     getConference().send(c1);
 
     m_prevLeftMotorDutyCycle = leftMotorDutyCycle;
+    std::cout << "SEND left motor" << std::endl;
   }
 
   if(rightMotorDutyCycle != m_prevRightMotorDutyCycle)
@@ -186,6 +198,7 @@ void Navigation::sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMo
     getConference().send(c2);
 
     m_prevRightMotorDutyCycle = rightMotorDutyCycle;
+    std::cout << "SEND right motor" << std::endl;
   }
 }
 
