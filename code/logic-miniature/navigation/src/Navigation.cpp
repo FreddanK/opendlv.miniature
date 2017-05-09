@@ -100,12 +100,6 @@ void Navigation::tearDown()
 */
 odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 {
-  uint32_t value4 = 13157;
-  opendlv::proxy::PwmRequest request4(0, value4);
-  odcore::data::Container c4(request4);
-  uint32_t stamp4 = 3;
-  c4.setSenderStamp(stamp4);
-  getConference().send(c4);
 
   while (getModuleStateAndWaitForRemainingTimeInTimeslice() == 
       odcore::data::dmcp::ModuleStateMessage::RUNNING) {
@@ -152,8 +146,8 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     } else {
       std::cout << "Moving forward..." << std::endl;
-      leftMotorDutyCycle = 40000;
-      rightMotorDutyCycle = 40000;
+      leftMotorDutyCycle = 41000;
+      rightMotorDutyCycle = 41000;
       leftWheelDirection = Direction::forward;
       rightWheelDirection = Direction::forward;
     }
@@ -168,6 +162,9 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     sendMotorCommands(leftMotorDutyCycle, rightMotorDutyCycle);
     sendGPIOCommands(leftWheelDirection, rightWheelDirection);
+
+    std::cout << "IR sensor voltage: " << m_analogReadings[0] << std::endl;
+
   }
   return odcore::data::dmcp::ModuleExitCodeMessage::OKAY;
 }

@@ -51,6 +51,7 @@ add_subdirectory(analog)
 add_subdirectory(gpio)
 add_subdirectory(pwm)
 add_subdirectory(sonar-pru)
+add_subdirectory(irdetection)
 
 ###########################################################################
 # Enable CPack to create .deb and .rpm.

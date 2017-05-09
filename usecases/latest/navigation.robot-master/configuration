@@ -90,16 +90,24 @@ proxy-miniature-pwm:2.pins = 0
 proxy-miniature-pwm:2.periodsNs = 50000
 proxy-miniature-pwm:2.dutyCyclesNs = 25000
 
-proxy-miniature-pwm:3.debug = 1
-proxy-miniature-pwm:3.systemPath = /sys/class/pwm/pwmchip4
-proxy-miniature-pwm:3.pins = 0
-proxy-miniature-pwm:3.periodsNs = 26315
-proxy-miniature-pwm:3.dutyCyclesNs = 13157
+#proxy-miniature-pwm:3.debug = 1
+#proxy-miniature-pwm:3.systemPath = /sys/class/pwm/pwmchip4
+#proxy-miniature-pwm:3.pins = 0
+#proxy-miniature-pwm:3.periodsNs = 26315
+#proxy-miniature-pwm:3.dutyCyclesNs = 13157
 
 proxy-miniature-sonar-pru.pruIndex = 0
 proxy-miniature-sonar-pru.debug = 1
 proxy-miniature-sonar-pru.firmwarePath = ../share/opendlv-proxy-miniature-sonar-pru/firmware/hcsr04.bin
 
+proxy-miniature-irdetection.debug = 1
+proxy-miniature-irdetection.numberOfReadings = 4
+proxy-miniature-irdetection.conversion-constant = 1
+proxy-miniature-irdetection.analogPins = 0,1,2,3,4,5,6
+proxy-miniature-irdetection.systemPath = /sys/class/pwm/pwmchip4
+proxy-miniature-irdetection.pins = 0
+proxy-miniature-irdetection.periodsNs = 26315
+proxy-miniature-irdetection.dutyCyclesNs = 13157
 ###############################################################################
 ###############################################################################
 #
