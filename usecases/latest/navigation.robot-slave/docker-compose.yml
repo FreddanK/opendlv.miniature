@@ -38,7 +38,7 @@ services:
         volumes:
             - /sys/:/sys/
         network_mode: "host"
-        command: "/opt/opendlv.miniature/bin/opendlv-proxy-miniature-irdetection --cid=${CID} --freq=10 --id=1"
+        command: "/opt/opendlv.miniature/bin/opendlv-proxy-miniature-irdetection --cid=${CID} --freq=100 --id=1"
 
     proxy-miniature-sonar-pru:
         build: .

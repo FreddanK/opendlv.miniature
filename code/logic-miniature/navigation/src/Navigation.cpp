@@ -163,7 +163,8 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     sendMotorCommands(leftMotorDutyCycle, rightMotorDutyCycle);
     sendGPIOCommands(leftWheelDirection, rightWheelDirection);
 
-    std::cout << "IR sensor voltage: " << m_analogReadings[0] << std::endl;
+    std::cout << "IR sensor 1 voltage: " << m_analogReadings[0] << std::endl;
+    std::cout << "IR sensor 2 voltage: " << m_analogReadings[1] << std::endl;
 
   }
   return odcore::data::dmcp::ModuleExitCodeMessage::OKAY;
