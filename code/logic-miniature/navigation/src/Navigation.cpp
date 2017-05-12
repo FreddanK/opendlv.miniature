@@ -141,7 +141,6 @@ void Navigation::tearDown()
 */
 odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 {
-
   while (getModuleStateAndWaitForRemainingTimeInTimeslice() == 
       odcore::data::dmcp::ModuleStateMessage::RUNNING) {
 
@@ -163,7 +162,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     odcore::data::TimeStamp now;
 
     // Check for collision
-    if (m_pruReading < 30.0) {
+    if (m_pruReading < 3.0 && m_pruReading >= 0) {
       m_sonarDetectionTime = now;
     }
 
@@ -195,7 +194,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     // Check if robot slave is initialized
     double initialSensorReading = 0.0;
-    if(!(m_pruReading > initialSensorReading))
+    if(!(m_pruReading > initialSensorReading) && m_pruReading >= 0.0)
     {
       leftMotorDutyCycle = 0;
       rightMotorDutyCycle = 0;
