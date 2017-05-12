@@ -268,18 +268,23 @@ void Differential::ConvertBoardDataToSensorReading(
     uint32_t sensorId = distanceReading.first;
     double distance = distanceReading.second;
     
+    std::cout << "Distance: " << distance << std::endl;
+
     float voltage = 1.8f;
     if (distance > 0.0 && distance < maxDistance) {
       voltage = 1.8f * static_cast<float>(distance / maxDistance);
     }
 
-    opendlv::proxy::AnalogReading analogReading(sensorId, voltage);
-    odcore::data::Container analogContainer(analogReading);
-    getConference().send(analogContainer);
-    
-    opendlv::proxy::ProximityReading proximityReading(distance);
-    odcore::data::Container proximityContainer(proximityReading);
-    getConference().send(proximityContainer);
+    if (sensorId == 3) { // Ping sensor
+      opendlv::proxy::ProximityReading proximityReading(
+          (distance < 0.0) ? -1 : distance*10);
+      odcore::data::Container proximityContainer(proximityReading);
+      getConference().send(proximityContainer);
+    } else { // IR sensor
+      opendlv::proxy::AnalogReading analogReading(sensorId, voltage);
+      odcore::data::Container analogContainer(analogReading);
+      getConference().send(analogContainer);
+    }   
   }
 }
 
