@@ -42,13 +42,13 @@ Differential::Differential(const int &argc, char **argv)
   , m_mutex()
   , m_currentEgoState()
   , m_debug()
-  , m_gpioInA(false)
-  , m_gpioInB(false)
-  , m_gpioInC(false)
-  , m_gpioInD(false)
+  , m_gpioIn30(false)
+  , m_gpioIn31(false)
+  , m_gpioIn51(false)
+  , m_gpioIn60(false)
   , m_deltaTime()
-  , m_leftWheelAngularVelocity(0.0)
-  , m_rightWheelAngularVelocity(0.0)
+  , m_leftMotorDutyCycleNs(0)
+  , m_rightMotorDutyCycleNs(0)
 {
 }
 
@@ -61,6 +61,7 @@ void Differential::nextContainer(odcore::data::Container &a_c)
   odcore::base::Lock l(m_mutex);
 
   int32_t dataType = a_c.getDataType();
+
   if (dataType == automotive::miniature::SensorBoardData::ID()) {
     auto sensorBoardData = 
         a_c.getData<automotive::miniature::SensorBoardData>();
@@ -86,7 +87,19 @@ void Differential::nextContainer(odcore::data::Container &a_c)
     }
     uint16_t senderStamp = a_c.getSenderStamp();
     uint32_t dutyCycleNs = request.getDutyCycleNs();
-    ConvertPwmToWheelAngularVelocity(senderStamp, dutyCycleNs);
+    if (senderStamp == 1)
+      m_leftMotorDutyCycleNs = dutyCycleNs;
+    else if (senderStamp == 2)
+      m_rightMotorDutyCycleNs = dutyCycleNs;
+  } else if (dataType == opendlv::proxy::ToggleRequest::ID()) {
+    auto request = a_c.getData<opendlv::proxy::ToggleRequest>();
+    uint16_t pin = request.getPin();
+    bool state = (request.getState() == opendlv::proxy::ToggleRequest::On);
+    SetMotorControl(pin, state);
+    if (m_debug) {
+      std::cout << "[" << getName() << "] Recieved a ToggleRequest: "
+        << request.toString() << "." << std::endl;
+    }
   }
 }
 
@@ -114,7 +127,12 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
       odcore::data::dmcp::ModuleStateMessage::RUNNING) {
   
     odcore::base::Lock l(m_mutex);
-  
+ 
+//    std::cout << "gpio30: " << m_gpioIn30 << endl;
+//    std::cout << "gpio31: " << m_gpioIn31 << endl;
+//    std::cout << "gpio51: " << m_gpioIn51 << endl;
+//    std::cout << "gpio60: " << m_gpioIn60 << endl;
+
     opendlv::data::environment::Point3 prevPosition = 
       m_currentEgoState.getPosition();
     opendlv::data::environment::Point3 prevRotation = 
@@ -133,15 +151,45 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
     double prevYaw = atan2(prevRotation.getY(), prevRotation.getX());
     // NOTE: Do not change the code above.
 
+    // Convert from duty cycle to angular velocity
+    double leftWheelAngularVelocity = 
+      ConvertDutyCycleNsToWheelAngularVelocity(m_leftMotorDutyCycleNs);
+    double rightWheelAngularVelocity =
+      ConvertDutyCycleNsToWheelAngularVelocity(m_rightMotorDutyCycleNs);
+    
+    // Set wheel directions based on gpio pins
+    if (m_gpioIn30 && !m_gpioIn31) {
+      // Forward
+      leftWheelAngularVelocity = (leftWheelAngularVelocity < 0) ? 
+       -leftWheelAngularVelocity : leftWheelAngularVelocity;
+    } else if (!m_gpioIn30 && m_gpioIn31) {
+      // Backward
+      leftWheelAngularVelocity = (leftWheelAngularVelocity >= 0) ?
+        -leftWheelAngularVelocity : leftWheelAngularVelocity;
+    } else {
+      leftWheelAngularVelocity = 0.0f;
+    }
+    if (m_gpioIn51 && !m_gpioIn60) {
+      // Forward
+      rightWheelAngularVelocity = (rightWheelAngularVelocity < 0) ?
+        -rightWheelAngularVelocity : rightWheelAngularVelocity;
+    } else if (!m_gpioIn51 && m_gpioIn60) {
+      // Backward
+      rightWheelAngularVelocity = (rightWheelAngularVelocity >= 0) ?
+        -rightWheelAngularVelocity : rightWheelAngularVelocity;
+    } else {
+      rightWheelAngularVelocity = 0.0f;
+    }
+
     // Constant definitions
     double const radiusBody = 0.12; // (m)
     double const radiusWheel = 0.06; // (m)
 
     // Kinematic equations below
-    double bodyVelocity = radiusWheel*(m_leftWheelAngularVelocity 
-                            + m_rightWheelAngularVelocity)/2;
-    double yawRate = -radiusWheel*(m_leftWheelAngularVelocity 
-                        - m_rightWheelAngularVelocity)/(2*radiusBody); 
+    double bodyVelocity = radiusWheel*(leftWheelAngularVelocity 
+                            + rightWheelAngularVelocity)/2;
+    double yawRate = -radiusWheel*(leftWheelAngularVelocity 
+                        - rightWheelAngularVelocity)/(2*radiusBody); 
 
     // Integrate yawRate so that yaw can be used to calculate velX and velY
     double yaw = prevYaw + yawRate*m_deltaTime; 
@@ -194,42 +242,18 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
   return odcore::data::dmcp::ModuleExitCodeMessage::OKAY;
 }
 
-void Differential::ConvertPwmToWheelAngularVelocity(uint16_t a_senderStamp, 
-    uint32_t a_dutyCycleNs)
+double Differential::ConvertDutyCycleNsToWheelAngularVelocity(uint32_t a_dutyCycleNs)
 {
-  int32_t const minDutyCycleNs = 25000; 
-  int32_t const maxDutyCycleNs = 50000; 
+    int32_t const minDutyCycleNs = 25000; 
+    int32_t const maxDutyCycleNs = 50000; 
 
-  double const maxAngularVelocity = 10.0;
+    double const maxAngularVelocity = 10.0;
 
-  a_dutyCycleNs = (a_dutyCycleNs < minDutyCycleNs) ? minDutyCycleNs : a_dutyCycleNs; 
-  a_dutyCycleNs = (a_dutyCycleNs > maxDutyCycleNs) ? maxDutyCycleNs : a_dutyCycleNs; 
-  
-  double wheelAngularVelocity = maxAngularVelocity * 
-    (a_dutyCycleNs - minDutyCycleNs) / 
-    static_cast<double>(maxDutyCycleNs - minDutyCycleNs); 
-      
-  if (a_senderStamp == 1) {
-    if (m_gpioInA && !m_gpioInB) {
-      // Clockwise
-      m_leftWheelAngularVelocity = -wheelAngularVelocity;
-    } else if (!m_gpioInA && m_gpioInB) {
-      // Counter clockwise
-      m_leftWheelAngularVelocity = wheelAngularVelocity;
-    } else {
-      m_leftWheelAngularVelocity = 0.0;
-    }
-  } else if (a_senderStamp == 2) {
-    if (m_gpioInC && !m_gpioInD) {
-      // Clockwise
-      m_rightWheelAngularVelocity = wheelAngularVelocity;
-    } else if (!m_gpioInC && m_gpioInD) {
-      // Counter clockwise
-      m_rightWheelAngularVelocity = -wheelAngularVelocity;
-    } else {
-      m_rightWheelAngularVelocity = 0.0f;
-    }
-  }
+    a_dutyCycleNs = (a_dutyCycleNs < minDutyCycleNs) ? minDutyCycleNs : a_dutyCycleNs; 
+    a_dutyCycleNs = (a_dutyCycleNs > maxDutyCycleNs) ? maxDutyCycleNs : a_dutyCycleNs;
+    
+    return maxAngularVelocity * (a_dutyCycleNs - minDutyCycleNs) / 
+      static_cast<double>(maxDutyCycleNs - minDutyCycleNs); 
 }
 
 void Differential::ConvertBoardDataToSensorReading(
@@ -264,22 +288,22 @@ void Differential::SetMotorControl(uint16_t a_pin, bool a_state)
   switch (a_pin) {
     case 30:
       {
-        m_gpioInB = a_state;
+        m_gpioIn30 = a_state;
         break;
       }
     case 31:
       {
-        m_gpioInA = a_state;
-        break;
-      }
-    case 60:
-      {
-        m_gpioInC = a_state;
+        m_gpioIn31 = a_state;
         break;
       }
     case 51:
       {
-        m_gpioInD = a_state;
+        m_gpioIn51 = a_state;
+        break;
+      }
+    case 60:
+      {
+        m_gpioIn60 = a_state;
         break;
       }
     default:
