@@ -91,16 +91,7 @@ void Differential::nextContainer(odcore::data::Container &a_c)
       m_leftMotorDutyCycleNs = dutyCycleNs;
     else if (senderStamp == 2)
       m_rightMotorDutyCycleNs = dutyCycleNs;
-  } else if (dataType == opendlv::proxy::ToggleRequest::ID()) {
-    auto request = a_c.getData<opendlv::proxy::ToggleRequest>();
-    uint16_t pin = request.getPin();
-    bool state = (request.getState() == opendlv::proxy::ToggleRequest::On);
-    SetMotorControl(pin, state);
-    if (m_debug) {
-      std::cout << "[" << getName() << "] Recieved a ToggleRequest: "
-        << request.toString() << "." << std::endl;
-    }
-  }
+  } 
 }
 
 void Differential::setUp()
