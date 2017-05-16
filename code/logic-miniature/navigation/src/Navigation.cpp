@@ -58,8 +58,8 @@ Navigation::Navigation(const int &argc, char **argv)
     , m_prevRightMotorDutyCycle(0)
     , m_prevLeftWheelDirection(Direction::backward)
     , m_prevRightWheelDirection(Direction::backward)
-    , m_PIDController(10.0, 1.0, 1.0)
-    , m_path()
+    , m_PIDController(10000.0, 0.0, 0.0)
+    , m_path({{0.0, 0.0}, {25.0, 0.0}, {30.0, -5.0}, {30.0, -10.0}, {40.0, -10.0}, {40.0, -20.0}, {10.0, -20.0}, {5.0, -10.0}, {0.0, 0.0}})
     , m_pathCurrentPointIndex(0)
     , m_currentState(State::Stop)
     , m_stateTimer(0.0)
@@ -186,15 +186,41 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       const uint32_t baseMotorDutyCycleNs = 40000;
 
       std::vector<double> targetPosition = pathUpdateCurrentTarget(m_xPositionLPS, m_yPositionLPS);
-      double angleToTarget = atan2(targetPosition[0] - m_xPositionLPS, targetPosition[1] - m_yPositionLPS);
-      double angleError = m_yawLPS - angleToTarget;
 
+      double headingX = cos(m_yawLPS);
+      double headingY = sin(m_yawLPS);
+      double diffX = targetPosition[0] - m_xPositionLPS;
+      double diffY = targetPosition[1] - m_yPositionLPS;
+
+      // Calculate angle between vector pointing to target and vector pointing in the direction of the robot
+      double angleToTarget = acos((headingX*diffX + headingY*diffY) /
+          (sqrt(headingX*headingX + headingY*headingY) * sqrt(diffX*diffX + diffY*diffY)));
+
+      // Check cross product to see which way to turn
+      bool turnLeft = true;
+      if (headingX*diffY - headingY*diffX < 0)
+        turnLeft = false;
+
+      double angleError;
+      if (turnLeft) {
+        angleError = -angleToTarget;
+      } else {
+        angleError = angleToTarget;
+      }
+
+      // Get PID output
       uint32_t motorsDutyCycleDifference = m_PIDController.update(angleError, m_deltaTime);
-      leftMotorDutyCycle = baseMotorDutyCycleNs - motorsDutyCycleDifference;
-      rightMotorDutyCycle = baseMotorDutyCycleNs + motorsDutyCycleDifference;
+      
+      // Set motor pwms
+      leftMotorDutyCycle = baseMotorDutyCycleNs + motorsDutyCycleDifference;
+      rightMotorDutyCycle = baseMotorDutyCycleNs - motorsDutyCycleDifference;
+      leftMotorDutyCycle = (leftMotorDutyCycle > 50000) ? 50000 : leftMotorDutyCycle;
+      rightMotorDutyCycle = (rightMotorDutyCycle > 50000) ? 50000 : rightMotorDutyCycle;
+      leftMotorDutyCycle = (leftMotorDutyCycle < 25000) ? 25000 : leftMotorDutyCycle;
+      rightMotorDutyCycle = (rightMotorDutyCycle < 25000) ? 25000 : rightMotorDutyCycle;
       leftWheelDirection = Direction::forward;
       rightWheelDirection = Direction::forward;
-      
+     
       if(sonarDistance < 30 || irLeftDetection || irRightDetection)
       {
         m_currentState = State::Avoid;
@@ -230,7 +256,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
       if(m_stateTimer > m_stateTimeout)
       {
-        m_currentState = State::Cruise;
+        m_currentState = State::PathFollow;
         m_stateTimer = 0;
       }
     }
@@ -243,7 +269,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
       if(m_stateTimer > m_stateTimeout)
       {
-        m_currentState = State::Cruise;
+        m_currentState = State::PathFollow;
         m_stateTimer = 0;
       }
     }
@@ -405,6 +431,9 @@ void Navigation::nextContainer(odcore::data::Container &a_c)
     m_xPositionLPS = static_cast<double>(state.getPosition().getX());
     m_yPositionLPS = static_cast<double>(state.getPosition().getY());
     m_yawLPS = static_cast<double>(state.getAngularDisplacement().getZ());
+  
+    //std::cout << "[" << getName() << "] Received a LPS-reading: "
+    //    << state.toString() << "." << std::endl;
   }
 }
 
@@ -428,15 +457,17 @@ std::vector<data::environment::Point3> Navigation::ReadPointString(std::string c
 
 std::vector<double> Navigation::pathUpdateCurrentTarget(double currentX, double currentY)
 {
-  const double distanceToSwitchTargetPoint = 10.0;
+  const double distanceToSwitchTargetPoint = 2.0;
 
   double pointX = m_path[m_pathCurrentPointIndex][0];
   double pointY = m_path[m_pathCurrentPointIndex][1];
   double distance = sqrt((pointX-currentX)*(pointX-currentX) + (pointY-currentY)*(pointY-currentY));
 
-  if (distance < distanceToSwitchTargetPoint &&
-      m_pathCurrentPointIndex < (m_path.size())) {
+  if (distance < distanceToSwitchTargetPoint) {
     m_pathCurrentPointIndex++;
+    if (m_pathCurrentPointIndex >= m_path.size()) {
+      m_pathCurrentPointIndex = 0;
+    }
   }
 
   return m_path[m_pathCurrentPointIndex];
