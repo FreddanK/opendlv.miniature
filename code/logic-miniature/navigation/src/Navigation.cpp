@@ -56,6 +56,10 @@ Navigation::Navigation(const int &argc, char **argv)
     , m_prevRightMotorDutyCycle(0)
     , m_prevLeftWheelDirection(Direction::backward)
     , m_prevRightWheelDirection(Direction::backward)
+    , m_currentState(State::Stop)
+    , m_stateTimer(0.0)
+    , m_stateTimeout(5.0)
+    , m_deltaTime()
 {
 }
 
@@ -125,6 +129,8 @@ void Navigation::setUp()
   for (uint32_t i = 0; i < m_pointsOfInterest.size(); i++) {
     std::cout << "Point of interest " << i << ": " << m_pointsOfInterest[i].toString() << std::endl;
   }
+
+  m_deltaTime = 1 / getFrequency();
 }
 
 /*
@@ -142,7 +148,7 @@ void Navigation::tearDown()
 */
 odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 {
-bool pathFound = false;
+  bool pathFound = false;
   while (getModuleStateAndWaitForRemainingTimeInTimeslice() == 
       odcore::data::dmcp::ModuleStateMessage::RUNNING) {
 
@@ -160,38 +166,58 @@ bool pathFound = false;
     Direction leftWheelDirection = Direction::forward;
     Direction rightWheelDirection = Direction::forward;
 
+    // Get sensor distances
+    double sonarDistance = m_pruReading; // (centimeters)
+    if(sonarDistance < 0) sonarDistance = 4000;
 
-    odcore::data::TimeStamp now;
+    bool irLeftDetection = false;
+    bool irRightDetection = false;
+    if(m_analogReadings[1] < (float)1.7) irLeftDetection = true;
+    if(m_analogReadings[0] < (float)1.7) irRightDetection = true;
 
-    // Check for collision
-    if (m_pruReading < 30.0) {
-      m_sonarDetectionTime = now;
-    }
 
-    double timeSinceLastSonarDetection = static_cast<double>(now.toMicroseconds() - m_sonarDetectionTime.toMicroseconds()) / 1000000.0;
-
-    //std::cout << "Sonar sensor reading: " << m_pruReading << ", with time stamp: " << timeSinceLastSonarDetection << std::endl;
-
-    if (timeSinceLastSonarDetection < 1.5) {	
-      std::cout << "Backing..." << std::endl;
-      leftMotorDutyCycle = 40000;
-      rightMotorDutyCycle = 40000;
-      leftWheelDirection = Direction::backward;
-      rightWheelDirection = Direction::backward;
-
-    } else if (timeSinceLastSonarDetection < 3.0) {
-      std::cout << "Turning..." << std::endl;
-      leftMotorDutyCycle = 40000;
-      rightMotorDutyCycle = 40000;
-      leftWheelDirection = Direction::backward;
-      rightWheelDirection = Direction::forward;
-
-    } else {
+    if(m_currentState == State::Cruise)
+    {
       std::cout << "Moving forward..." << std::endl;
       leftMotorDutyCycle = 41000;
       rightMotorDutyCycle = 41000;
       leftWheelDirection = Direction::forward;
       rightWheelDirection = Direction::forward;
+
+      if(sonarDistance < 30 || irLeftDetection || irRightDetection)
+      {
+        m_currentState = State::Avoid;
+        m_stateTimer = 0;
+        m_stateTimeout = 1.5;
+      }
+    }
+    // State avoid
+    if(m_currentState == State::Avoid)
+    {
+      std::cout << "Turning..." << std::endl;
+      leftMotorDutyCycle = 40000;
+      rightMotorDutyCycle = 40000;
+      leftWheelDirection = Direction::forward;
+      rightWheelDirection = Direction::backward;
+
+      if(m_stateTimer > m_stateTimeout)
+      {
+        m_currentState = State::Cruise;
+        m_stateTimer = 0;
+      }
+    }
+
+    // State Stop
+    if(m_currentState == State::Stop)
+    {
+      leftMotorDutyCycle = 0;
+      rightMotorDutyCycle = 0;
+
+      if(m_stateTimer > m_stateTimeout)
+      {
+        m_currentState = State::Cruise;
+        m_stateTimer = 0;
+      }
     }
 	
 	if (!pathFound) {
@@ -226,16 +252,19 @@ bool pathFound = false;
 
     // Check if robot slave is initialized
     double initialSensorReading = 0.0;
-    if(!(m_pruReading > initialSensorReading))
+    if(!(m_pruReading > initialSensorReading) && m_pruReading >= 0.0)
     {
       leftMotorDutyCycle = 0;
       rightMotorDutyCycle = 0;
+      m_stateTimer = 0;
     }
 
     sendMotorCommands(leftMotorDutyCycle, rightMotorDutyCycle);
     sendGPIOCommands(leftWheelDirection, rightWheelDirection);
     //std::cout << "IR sensor 1 voltage: " << m_analogReadings[0] << std::endl;
     //std::cout << "IR sensor 2 voltage: " << m_analogReadings[1] << std::endl;
+
+    m_stateTimer += m_deltaTime;
 
   }
   return odcore::data::dmcp::ModuleExitCodeMessage::OKAY;

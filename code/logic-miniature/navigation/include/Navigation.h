@@ -49,6 +49,7 @@ class Navigation :
   std::vector<data::environment::Point3> ReadPointString(std::string const &) const;
 
   enum Direction {forward, backward};
+  enum State {PathFollow, Avoid, Stop, Cruise};
 
   void sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMotorDutyCycle);
   void sendGPIOCommands(Direction leftWheelDirection, Direction rightWheelDirection);
@@ -69,6 +70,11 @@ class Navigation :
   uint32_t m_prevRightMotorDutyCycle;
   Direction m_prevLeftWheelDirection;
   Direction m_prevRightWheelDirection;
+
+  State m_currentState;
+  double m_stateTimer;
+  double m_stateTimeout;
+  double m_deltaTime;
   
 
 };

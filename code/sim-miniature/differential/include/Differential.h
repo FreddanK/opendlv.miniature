@@ -46,7 +46,7 @@ class Differential :
   virtual void setUp();
   virtual void tearDown();
   odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode body();
-  void ConvertPwmToWheelAngularVelocity(uint16_t, uint32_t);
+  double ConvertDutyCycleNsToWheelAngularVelocity(uint32_t);
   void ConvertBoardDataToSensorReading(
     automotive::miniature::SensorBoardData const &);
   void SetMotorControl(uint16_t, bool);
@@ -54,13 +54,13 @@ class Differential :
   odcore::base::Mutex m_mutex;
   opendlv::data::environment::EgoState m_currentEgoState;
   bool m_debug;
-  bool m_gpioInA;
-  bool m_gpioInB;
-  bool m_gpioInC;
-  bool m_gpioInD;
+  bool m_gpioIn30;
+  bool m_gpioIn31;
+  bool m_gpioIn51;
+  bool m_gpioIn60;
   double m_deltaTime;
-  double m_leftWheelAngularVelocity;
-  double m_rightWheelAngularVelocity;
+  int32_t m_leftMotorDutyCycleNs;
+  int32_t m_rightMotorDutyCycleNs;
 };
 
 }
