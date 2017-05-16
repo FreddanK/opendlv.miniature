@@ -51,6 +51,9 @@ Navigation::Navigation(const int &argc, char **argv)
     , m_pwmOutputPins()
     , m_pruReading()
     , m_sonarDetectionTime()
+    , m_xPositionLPS(0.0)
+    , m_yPositionLPS(0.0)
+    , m_yawLPS(0.04)
     , m_prevLeftMotorDutyCycle(0)
     , m_prevRightMotorDutyCycle(0)
     , m_prevLeftWheelDirection(Direction::backward)
@@ -176,6 +179,29 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     if(m_analogReadings[1] < (float)1.7) irLeftDetection = true;
     if(m_analogReadings[0] < (float)1.7) irRightDetection = true;
 
+    
+    // State follow path
+    if(m_currentState == State::PathFollow)
+    {
+      const uint32_t baseMotorDutyCycleNs = 40000;
+
+      std::vector<double> targetPosition = pathUpdateCurrentTarget(m_xPositionLPS, m_yPositionLPS);
+      double angleToTarget = atan2(targetPosition[0] - m_xPositionLPS, targetPosition[1] - m_yPositionLPS);
+      double angleError = m_yawLPS - angleToTarget;
+
+      uint32_t motorsDutyCycleDifference = m_PIDController.update(angleError, m_deltaTime);
+      leftMotorDutyCycle = baseMotorDutyCycleNs - motorsDutyCycleDifference;
+      rightMotorDutyCycle = baseMotorDutyCycleNs + motorsDutyCycleDifference;
+      leftWheelDirection = Direction::forward;
+      rightWheelDirection = Direction::forward;
+      
+      if(sonarDistance < 30 || irLeftDetection || irRightDetection)
+      {
+        m_currentState = State::Avoid;
+        m_stateTimer = 0;
+        m_stateTimeout = 1.5;
+      }
+    }
 
     if(m_currentState == State::Cruise)
     {
@@ -373,6 +399,12 @@ void Navigation::nextContainer(odcore::data::Container &a_c)
     double distance = reading.getProximity();
 
     m_pruReading = distance;
+  } else if (dataType == opendlv::model::State::ID()) {
+    opendlv::model::State state = a_c.getData<opendlv::model::State>();
+
+    m_xPositionLPS = static_cast<double>(state.getPosition().getX());
+    m_yPositionLPS = static_cast<double>(state.getPosition().getY());
+    m_yawLPS = static_cast<double>(state.getAngularDisplacement().getZ());
   }
 }
 
@@ -394,7 +426,7 @@ std::vector<data::environment::Point3> Navigation::ReadPointString(std::string c
   return points;
 }
 
-std::vector<double> Navigation::pathUpdateCurrentPoint(double currentX, double currentY)
+std::vector<double> Navigation::pathUpdateCurrentTarget(double currentX, double currentY)
 {
   const double distanceToSwitchTargetPoint = 10.0;
 

@@ -49,7 +49,7 @@ class Navigation :
   void tearDown();
   virtual odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode body();
   std::vector<data::environment::Point3> ReadPointString(std::string const &) const;
-  std::vector<double> pathUpdateCurrentPoint(double, double);
+  std::vector<double> pathUpdateCurrentTarget(double, double);
 
   enum Direction {forward, backward};
   enum State {PathFollow, Avoid, Stop, Cruise};
@@ -68,6 +68,9 @@ class Navigation :
 
   double m_pruReading;
   odcore::data::TimeStamp m_sonarDetectionTime;
+  double m_xPositionLPS;
+  double m_yPositionLPS;
+  double m_yawLPS;
 
   uint32_t m_prevLeftMotorDutyCycle;
   uint32_t m_prevRightMotorDutyCycle;
