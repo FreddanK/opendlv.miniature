@@ -31,6 +31,7 @@
 #include <odvdminiature/GeneratedHeaders_ODVDMiniature.h>
 
 #include "Navigation.h"
+#include "Astar.h"
 
 namespace opendlv {
 namespace logic {
@@ -141,7 +142,7 @@ void Navigation::tearDown()
 */
 odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 {
-
+bool pathFound = false;
   while (getModuleStateAndWaitForRemainingTimeInTimeslice() == 
       odcore::data::dmcp::ModuleStateMessage::RUNNING) {
 
@@ -169,7 +170,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     double timeSinceLastSonarDetection = static_cast<double>(now.toMicroseconds() - m_sonarDetectionTime.toMicroseconds()) / 1000000.0;
 
-    std::cout << "Sonar sensor reading: " << m_pruReading << ", with time stamp: " << timeSinceLastSonarDetection << std::endl;
+    //std::cout << "Sonar sensor reading: " << m_pruReading << ", with time stamp: " << timeSinceLastSonarDetection << std::endl;
 
     if (timeSinceLastSonarDetection < 1.5) {	
       std::cout << "Backing..." << std::endl;
@@ -192,6 +193,36 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       leftWheelDirection = Direction::forward;
       rightWheelDirection = Direction::forward;
     }
+	
+	if (!pathFound) {
+		std::vector<std::vector<double> > outerWalls = {{50.84, -23.93}, {-9.48, -24.49}, {-9.70, 5.50}, {50.54, 5.65}};
+
+		std::vector<std::vector<double> > innerWalls = {{40.02, 5.86},{39.76, -6.63}, {2.88,5.33}, {2.92,0.57}, {-9.71,-4.17}, {-7.45,-4.11}, {33.06,-24.10}, {33.08,-19.09}, {33.08,-19.09}, {35.50,-19.10}, {20.74,-17.83}, {14.24,-7.36}, {14.24,-7.36}, {18.59,-4.93}, {18.59,-4.93}, {26.08,-6.93}, {26.08,-6.93}, {20.74,-17.83}};
+
+		Astar aStar;
+		aStar.setMapSize(60,30); // Set mapSize
+		double xStart = 0.0;
+		double yStart = -5.0;
+		double xTarget = 25.0;
+		double yTarget = 0.0;
+		std::vector<int16_t> startIndex = aStar.coordToIndex(xStart,yStart,outerWalls);
+		std::vector<int16_t> targetIndex = aStar.coordToIndex(xTarget,yTarget,outerWalls);
+		cout << "Start Index: " << startIndex[0] << " " << startIndex[1] << endl;
+		cout << "Target Index: " << targetIndex[0] << " " << targetIndex[1] << endl;
+		aStar.startNode.set_position(startIndex[0],startIndex[1]); // Set start
+		aStar.targetNode.set_position(targetIndex[0],targetIndex[1]); // Set target
+
+		std::vector<std::vector<int16_t> > map = aStar.createMap(outerWalls, innerWalls);
+		std::vector<std::vector<int16_t> > bestPath = aStar.getPath(map);
+
+		//aStar.printMap(map, bestPath);
+		std::vector<std::vector<double> > bestPathCoord = aStar.indexPathToCoordinate(bestPath, outerWalls);
+		pathFound = true;
+		/*for (uint16_t i=0; i<bestPathCoord.size(); i++) {
+			cout << "Idx: " << bestPath[i][0] << " " << bestPath[i][1] << endl;
+			cout << "Coord: " << bestPathCoord[i][0] << " " << bestPathCoord[i][1] << endl;
+		}*/
+	}
 
     // Check if robot slave is initialized
     double initialSensorReading = 0.0;
@@ -203,9 +234,8 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     sendMotorCommands(leftMotorDutyCycle, rightMotorDutyCycle);
     sendGPIOCommands(leftWheelDirection, rightWheelDirection);
-
-    std::cout << "IR sensor 1 voltage: " << m_analogReadings[0] << std::endl;
-    std::cout << "IR sensor 2 voltage: " << m_analogReadings[1] << std::endl;
+    //std::cout << "IR sensor 1 voltage: " << m_analogReadings[0] << std::endl;
+    //std::cout << "IR sensor 2 voltage: " << m_analogReadings[1] << std::endl;
 
   }
   return odcore::data::dmcp::ModuleExitCodeMessage::OKAY;
@@ -213,8 +243,8 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
 void Navigation::sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMotorDutyCycle)
 {
-    std::cout << "Pwm left motor: " << leftMotorDutyCycle << std::endl;
-    std::cout << "Pwm right motor: " << rightMotorDutyCycle << std::endl;
+    //std::cout << "Pwm left motor: " << leftMotorDutyCycle << std::endl;
+    //std::cout << "Pwm right motor: " << rightMotorDutyCycle << std::endl;
 
   if(leftMotorDutyCycle != m_prevLeftMotorDutyCycle)
   {
@@ -225,7 +255,7 @@ void Navigation::sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMo
     getConference().send(c1);
 
     m_prevLeftMotorDutyCycle = leftMotorDutyCycle;
-    std::cout << "SEND left motor" << std::endl;
+    //std::cout << "SEND left motor" << std::endl;
   }
 
   if(rightMotorDutyCycle != m_prevRightMotorDutyCycle)
@@ -237,7 +267,7 @@ void Navigation::sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMo
     getConference().send(c2);
 
     m_prevRightMotorDutyCycle = rightMotorDutyCycle;
-    std::cout << "SEND right motor" << std::endl;
+    //std::cout << "SEND right motor" << std::endl;
   }
 }
 
