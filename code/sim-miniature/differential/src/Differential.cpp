@@ -70,14 +70,14 @@ void Differential::nextContainer(odcore::data::Container &a_c)
           << sensorBoardData.toString() << "." << std::endl;
     }
     ConvertBoardDataToSensorReading(sensorBoardData);
-  } else if (dataType == opendlv::proxy::ToggleReading::ID()) {
-    auto reading = a_c.getData<opendlv::proxy::ToggleReading>();
-    uint16_t pin = reading.getPin();
-    bool state = (reading.getState() == opendlv::proxy::ToggleReading::ToggleState::On);
+  } else if (dataType == opendlv::proxy::ToggleRequest::ID()) {
+    auto request = a_c.getData<opendlv::proxy::ToggleRequest>();
+    uint16_t pin = request.getPin();
+    bool state = (request.getState() == opendlv::proxy::ToggleRequest::ToggleState::On);
     SetMotorControl(pin, state);
     if (m_debug) {
-      std::cout << "[" << getName() << "] Received a ToggleReading: "
-          << reading.toString() << "." << std::endl;
+      std::cout << "[" << getName() << "] Received a ToggleRequest: "
+          << request.toString() << "." << std::endl;
     }
   } else if (dataType == opendlv::proxy::PwmRequest::ID()) {
     auto request = a_c.getData<opendlv::proxy::PwmRequest>();
@@ -91,16 +91,7 @@ void Differential::nextContainer(odcore::data::Container &a_c)
       m_leftMotorDutyCycleNs = dutyCycleNs;
     else if (senderStamp == 2)
       m_rightMotorDutyCycleNs = dutyCycleNs;
-  } else if (dataType == opendlv::proxy::ToggleRequest::ID()) {
-    auto request = a_c.getData<opendlv::proxy::ToggleRequest>();
-    uint16_t pin = request.getPin();
-    bool state = (request.getState() == opendlv::proxy::ToggleRequest::On);
-    SetMotorControl(pin, state);
-    if (m_debug) {
-      std::cout << "[" << getName() << "] Recieved a ToggleRequest: "
-        << request.toString() << "." << std::endl;
-    }
-  }
+  } 
 }
 
 void Differential::setUp()
