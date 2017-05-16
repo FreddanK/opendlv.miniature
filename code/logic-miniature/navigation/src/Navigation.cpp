@@ -55,6 +55,9 @@ Navigation::Navigation(const int &argc, char **argv)
     , m_prevRightMotorDutyCycle(0)
     , m_prevLeftWheelDirection(Direction::backward)
     , m_prevRightWheelDirection(Direction::backward)
+    , m_PIDController(10.0, 1.0, 1.0)
+    , m_path()
+    , m_pathCurrentPointIndex(0)
 {
 }
 
@@ -170,7 +173,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     std::cout << "Sonar sensor reading: " << m_pruReading << ", with time stamp: " << timeSinceLastSonarDetection << std::endl;
 
-    if (timeSinceLastSonarDetection < 1.5) {	
+   if (timeSinceLastSonarDetection < 1.5) {	
       std::cout << "Backing..." << std::endl;
       leftMotorDutyCycle = 40000;
       rightMotorDutyCycle = 40000;
@@ -359,6 +362,22 @@ std::vector<data::environment::Point3> Navigation::ReadPointString(std::string c
     }
   }
   return points;
+}
+
+std::vector<double> Navigation::pathUpdateCurrentPoint(double currentX, double currentY)
+{
+  const double distanceToSwitchTargetPoint = 10.0;
+
+  double pointX = m_path[m_pathCurrentPointIndex][0];
+  double pointY = m_path[m_pathCurrentPointIndex][1];
+  double distance = sqrt((pointX-currentX)*(pointX-currentX) + (pointY-currentY)*(pointY-currentY));
+
+  if (distance < distanceToSwitchTargetPoint &&
+      m_pathCurrentPointIndex < (m_path.size())) {
+    m_pathCurrentPointIndex++;
+  }
+
+  return m_path[m_pathCurrentPointIndex];
 }
 
 }
