@@ -183,11 +183,11 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     bool irRightDetection = false;
     bool irLeftDetection = false;
-    if(m_analogReadings[0] < (float)1.7) irRightDetection = true;
-    if(m_analogReadings[1] < (float)1.7) irLeftDetection = true;
+    if(m_analogReadings[1] < 800) irRightDetection = true;
+    if(m_analogReadings[5] < 800) irLeftDetection = true;
 
-    std::cout << "Right IR sensor voltage: " << m_analogReadings[0] << std::endl;
-    std::cout << "Left IR sensor voltage: " << m_analogReadings[1] << std::endl;
+    std::cout << "Right IR sensor voltage: " << m_analogReadings[1] << std::endl;
+    std::cout << "Left IR sensor voltage: " << m_analogReadings[5] << std::endl;
     
     // State follow path
     if(m_currentState == State::PathFollow)

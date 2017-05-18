@@ -261,9 +261,9 @@ void Differential::ConvertBoardDataToSensorReading(
     
     std::cout << "Distance: " << distance << std::endl;
 
-    float voltage = 1.8f;
+    float voltage = 810.0f;
     if (distance > 0.0 && distance < maxDistance) {
-      voltage = 1.8f * static_cast<float>(distance / maxDistance);
+      voltage = 810.0f * static_cast<float>(distance / maxDistance);
     }
 
     if (sensorId == 3) { // Ping sensor
