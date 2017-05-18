@@ -59,9 +59,10 @@ Navigation::Navigation(const int &argc, char **argv)
     , m_prevRightMotorDutyCycle(0)
     , m_prevLeftWheelDirection(Direction::backward)
     , m_prevRightWheelDirection(Direction::backward)
-    , m_PIDController(10000.0, 0.0, 0.0)
+    , m_PIDController(10000.0, 1000.0, 0.0)
     , m_path() //m_path({{0.0, 0.0}, {25.0, 0.0}, {30.0, -5.0}, {30.0, -10.0}, {40.0, -10.0}, {40.0, -20.0}, {10.0, -20.0}, {5.0, -10.0}, {0.0, 0.0}})
     , m_pathCurrentPointIndex(0)
+    , m_followPathDirection(Direction::forward)
     , m_currentState(State::Stop)
     , m_stateTimer(0.0)
     , m_stateTimeout(5.0)
@@ -314,10 +315,10 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
 		Astar aStar;
 		aStar.setMapSize(60,30); // Set mapSize
-		double xStart = 0.0;
-		double yStart = -5.0;
-		double xTarget = 25.0;
-		double yTarget = 0.0;
+		double xStart = -5.0;
+		double yStart = 0.0;
+		double xTarget = 45.0;
+		double yTarget = -15.0;
 		std::vector<int16_t> startIndex = aStar.coordToIndex(xStart,yStart,outerWalls);
 		std::vector<int16_t> targetIndex = aStar.coordToIndex(xTarget,yTarget,outerWalls);
 		cout << "Start Index: " << startIndex[0] << " " << startIndex[1] << endl;
@@ -540,9 +541,21 @@ std::vector<double> Navigation::pathUpdateCurrentTarget(double currentX, double 
   double distance = sqrt((pointX-currentX)*(pointX-currentX) + (pointY-currentY)*(pointY-currentY));
 
   if (distance < distanceToSwitchTargetPoint) {
-    m_pathCurrentPointIndex++;
-    if (m_pathCurrentPointIndex >= path.size()) {
-      m_pathCurrentPointIndex = 0;
+    if (m_followPathDirection == Direction::forward){
+      // Following path in forward direction
+      m_pathCurrentPointIndex++;
+      if (m_pathCurrentPointIndex >= path.size()) {
+        m_pathCurrentPointIndex = path.size() - 2;
+        m_followPathDirection = Direction::backward;
+      }
+    } else {
+      // Following path in backward direction
+      if (m_pathCurrentPointIndex == 0) {
+        m_pathCurrentPointIndex = 1;
+        m_followPathDirection = Direction::forward;
+      } else {
+        m_pathCurrentPointIndex--;
+      }
     }
   }
 

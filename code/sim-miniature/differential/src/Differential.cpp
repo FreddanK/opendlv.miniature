@@ -146,7 +146,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
     double leftWheelAngularVelocity = 
       ConvertDutyCycleNsToWheelAngularVelocity(m_leftMotorDutyCycleNs);
     double rightWheelAngularVelocity =
-      ConvertDutyCycleNsToWheelAngularVelocity(m_rightMotorDutyCycleNs);
+      0.7*ConvertDutyCycleNsToWheelAngularVelocity(m_rightMotorDutyCycleNs);
     
     // Set wheel directions based on gpio pins
     if (m_gpioIn30 && !m_gpioIn31) {

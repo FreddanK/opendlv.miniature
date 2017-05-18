@@ -80,6 +80,7 @@ class Navigation :
   PIDController m_PIDController;
   std::vector<std::vector<double>> m_path;
   uint16_t m_pathCurrentPointIndex;
+  Direction m_followPathDirection;
   
   State m_currentState;
   double m_stateTimer;
