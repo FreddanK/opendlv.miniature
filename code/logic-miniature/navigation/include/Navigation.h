@@ -29,6 +29,8 @@
 #include <opendlv/data/environment/Line.h>
 #include <opendlv/data/environment/Point3.h>
 
+#include "PID.h"
+
 namespace opendlv {
 namespace logic {
 namespace miniature {
@@ -47,6 +49,7 @@ class Navigation :
   void tearDown();
   virtual odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode body();
   std::vector<data::environment::Point3> ReadPointString(std::string const &) const;
+  std::vector<double> pathUpdateCurrentTarget(double, double, std::vector<std::vector<double>>);
 
   enum Direction {forward, backward, right, left};
   enum State {PathFollow, Avoid, Stop, Cruise};
@@ -65,18 +68,23 @@ class Navigation :
 
   double m_pruReading;
   odcore::data::TimeStamp m_sonarDetectionTime;
+  double m_xPositionLPS;
+  double m_yPositionLPS;
+  double m_yawLPS;
 
   uint32_t m_prevLeftMotorDutyCycle;
   uint32_t m_prevRightMotorDutyCycle;
   Direction m_prevLeftWheelDirection;
   Direction m_prevRightWheelDirection;
-
+  
+  PIDController m_PIDController;
+  std::vector<std::vector<double>> m_path;
+  uint16_t m_pathCurrentPointIndex;
+  
   State m_currentState;
   double m_stateTimer;
   double m_stateTimeout;
   double m_deltaTime;
-  
-
 };
 
 }

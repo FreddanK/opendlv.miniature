@@ -52,10 +52,16 @@ Navigation::Navigation(const int &argc, char **argv)
     , m_pwmOutputPins()
     , m_pruReading()
     , m_sonarDetectionTime()
+    , m_xPositionLPS(0.0)
+    , m_yPositionLPS(0.0)
+    , m_yawLPS(0.04)
     , m_prevLeftMotorDutyCycle(0)
     , m_prevRightMotorDutyCycle(0)
     , m_prevLeftWheelDirection(Direction::backward)
     , m_prevRightWheelDirection(Direction::backward)
+    , m_PIDController(10000.0, 0.0, 0.0)
+    , m_path() //m_path({{0.0, 0.0}, {25.0, 0.0}, {30.0, -5.0}, {30.0, -10.0}, {40.0, -10.0}, {40.0, -20.0}, {10.0, -20.0}, {5.0, -10.0}, {0.0, 0.0}})
+    , m_pathCurrentPointIndex(0)
     , m_currentState(State::Stop)
     , m_stateTimer(0.0)
     , m_stateTimeout(5.0)
@@ -152,6 +158,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
   bool turnDirectionSet = false;
 
   bool pathFound = false;
+  std::vector<std::vector<double> > bestPathCoord;
 
   while (getModuleStateAndWaitForRemainingTimeInTimeslice() == 
       odcore::data::dmcp::ModuleStateMessage::RUNNING) {
@@ -180,6 +187,55 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     std::cout << "Right IR sensor voltage: " << m_analogReadings[1] << std::endl;
     std::cout << "Left IR sensor voltage: " << m_analogReadings[5] << std::endl;
+    
+    // State follow path
+    if(m_currentState == State::PathFollow)
+    {
+      const uint32_t baseMotorDutyCycleNs = 40000;
+
+      std::vector<double> targetPosition = pathUpdateCurrentTarget(m_xPositionLPS, m_yPositionLPS, bestPathCoord);
+
+      double headingX = cos(m_yawLPS);
+      double headingY = sin(m_yawLPS);
+      double diffX = targetPosition[0] - m_xPositionLPS;
+      double diffY = targetPosition[1] - m_yPositionLPS;
+
+      // Calculate angle between vector pointing to target and vector pointing in the direction of the robot
+      double angleToTarget = acos((headingX*diffX + headingY*diffY) /
+          (sqrt(headingX*headingX + headingY*headingY) * sqrt(diffX*diffX + diffY*diffY)));
+
+      // Check cross product to see which way to turn
+      bool turnLeft = true;
+      if (headingX*diffY - headingY*diffX < 0)
+        turnLeft = false;
+
+      double angleError;
+      if (turnLeft) {
+        angleError = -angleToTarget;
+      } else {
+        angleError = angleToTarget;
+      }
+
+      // Get PID output
+      uint32_t motorsDutyCycleDifference = m_PIDController.update(angleError, m_deltaTime);
+      
+      // Set motor pwms
+      leftMotorDutyCycle = baseMotorDutyCycleNs + motorsDutyCycleDifference;
+      rightMotorDutyCycle = baseMotorDutyCycleNs - motorsDutyCycleDifference;
+      leftMotorDutyCycle = (leftMotorDutyCycle > 50000) ? 50000 : leftMotorDutyCycle;
+      rightMotorDutyCycle = (rightMotorDutyCycle > 50000) ? 50000 : rightMotorDutyCycle;
+      leftMotorDutyCycle = (leftMotorDutyCycle < 25000) ? 25000 : leftMotorDutyCycle;
+      rightMotorDutyCycle = (rightMotorDutyCycle < 25000) ? 25000 : rightMotorDutyCycle;
+      leftWheelDirection = Direction::forward;
+      rightWheelDirection = Direction::forward;
+     
+      if(sonarDistance < 30 || irLeftDetection || irRightDetection)
+      {
+        m_currentState = State::Avoid;
+        m_stateTimer = 0;
+        m_stateTimeout = 1.5;
+      }
+    }
 
     if(m_currentState == State::Cruise)
     {
@@ -231,7 +287,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       {
         if(!(sonarDistance < 40))
         {
-          m_currentState = State::Cruise;
+          m_currentState = State::PathFollow;
           m_stateTimer = 0;
           turnDirectionSet = false;
         }
@@ -246,7 +302,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
       if(m_stateTimer > m_stateTimeout)
       {
-        m_currentState = State::Cruise;
+        m_currentState = State::PathFollow;
         m_stateTimer = 0;
       }
     }
@@ -273,7 +329,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 		std::vector<std::vector<int16_t> > bestPath = aStar.getPath(map);
 
 		//aStar.printMap(map, bestPath);
-		std::vector<std::vector<double> > bestPathCoord = aStar.indexPathToCoordinate(bestPath, outerWalls);
+		bestPathCoord = aStar.indexPathToCoordinate(bestPath, outerWalls);
 		pathFound = true;
 		/*for (uint16_t i=0; i<bestPathCoord.size(); i++) {
 			cout << "Idx: " << bestPath[i][0] << " " << bestPath[i][1] << endl;
@@ -445,6 +501,15 @@ void Navigation::nextContainer(odcore::data::Container &a_c)
     double distance = reading.getProximity();
 
     m_pruReading = distance;
+  } else if (dataType == opendlv::model::State::ID()) {
+    opendlv::model::State state = a_c.getData<opendlv::model::State>();
+
+    m_xPositionLPS = static_cast<double>(state.getPosition().getX());
+    m_yPositionLPS = static_cast<double>(state.getPosition().getY());
+    m_yawLPS = static_cast<double>(state.getAngularDisplacement().getZ());
+  
+    //std::cout << "[" << getName() << "] Received a LPS-reading: "
+    //    << state.toString() << "." << std::endl;
   }
 }
 
@@ -464,6 +529,24 @@ std::vector<data::environment::Point3> Navigation::ReadPointString(std::string c
     }
   }
   return points;
+}
+
+std::vector<double> Navigation::pathUpdateCurrentTarget(double currentX, double currentY, std::vector<std::vector<double>> path)
+{
+  const double distanceToSwitchTargetPoint = 2.0;
+
+  double pointX = path[m_pathCurrentPointIndex][0];
+  double pointY = path[m_pathCurrentPointIndex][1];
+  double distance = sqrt((pointX-currentX)*(pointX-currentX) + (pointY-currentY)*(pointY-currentY));
+
+  if (distance < distanceToSwitchTargetPoint) {
+    m_pathCurrentPointIndex++;
+    if (m_pathCurrentPointIndex >= path.size()) {
+      m_pathCurrentPointIndex = 0;
+    }
+  }
+
+  return path[m_pathCurrentPointIndex];
 }
 
 }
