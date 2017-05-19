@@ -183,8 +183,8 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     bool irRightDetection = false;
     bool irLeftDetection = false;
-    if(m_analogReadings[1] < 800) irRightDetection = true;
-    if(m_analogReadings[5] < 800) irLeftDetection = true;
+    if(m_analogReadings[1] < 850) irRightDetection = true;
+    if(m_analogReadings[5] < 850) irLeftDetection = true;
 
     std::cout << "Right IR sensor voltage: " << m_analogReadings[1] << std::endl;
     std::cout << "Left IR sensor voltage: " << m_analogReadings[5] << std::endl;
@@ -288,7 +288,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       {
         if(!(sonarDistance < 40))
         {
-          m_currentState = State::PathFollow;
+          m_currentState = State::Cruise;//State::PathFollow;
           m_stateTimer = 0;
           turnDirectionSet = false;
         }
@@ -303,7 +303,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
       if(m_stateTimer > m_stateTimeout)
       {
-        m_currentState = State::PathFollow;
+        m_currentState = State::Cruise;//State::PathFollow;
         m_stateTimer = 0;
       }
     }

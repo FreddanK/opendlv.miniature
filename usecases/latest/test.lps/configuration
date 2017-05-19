@@ -68,9 +68,9 @@ odsupercomponent.pulsetimeack.exclude = odcockpit
 # CONFIGURATION FOR PROXY
 #
 
-proxy-miniature-lps.searchMargin = 0.02
+proxy-miniature-lps.searchMargin = 0.04
 proxy-miniature-lps.frameId = 0
 proxy-miniature-lps.origoMarker = 0.0,0.0,0.0
-proxy-miniature-lps.forwardMarker = 0.158,0.0,0.0
-proxy-miniature-lps.leftwardMarker = 0.0,0.084,0.0
+proxy-miniature-lps.forwardMarker = 0.092,0.0,0.0
+proxy-miniature-lps.leftwardMarker = 0.0,0.062,0.0
 proxy-miniature-lps.debug = 1

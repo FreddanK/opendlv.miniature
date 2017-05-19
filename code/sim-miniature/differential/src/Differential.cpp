@@ -146,7 +146,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
     double leftWheelAngularVelocity = 
       ConvertDutyCycleNsToWheelAngularVelocity(m_leftMotorDutyCycleNs);
     double rightWheelAngularVelocity =
-      0.7*ConvertDutyCycleNsToWheelAngularVelocity(m_rightMotorDutyCycleNs);
+      ConvertDutyCycleNsToWheelAngularVelocity(m_rightMotorDutyCycleNs);
     
     // Set wheel directions based on gpio pins
     if (m_gpioIn30 && !m_gpioIn31) {
@@ -261,9 +261,9 @@ void Differential::ConvertBoardDataToSensorReading(
     
     std::cout << "Distance: " << distance << std::endl;
 
-    float voltage = 810.0f;
+    float voltage = 850.0f;
     if (distance > 0.0 && distance < maxDistance) {
-      voltage = 810.0f * static_cast<float>(distance / maxDistance);
+      voltage = 850.0f * static_cast<float>(distance / maxDistance);
     }
 
     if (sensorId == 3) { // Ping sensor
