@@ -71,6 +71,7 @@ class Navigation :
   double m_xPositionLPS;
   double m_yPositionLPS;
   double m_yawLPS;
+  odcore::data::TimeStamp m_timeLastLPSSignal;
 
   uint32_t m_prevLeftMotorDutyCycle;
   uint32_t m_prevRightMotorDutyCycle;

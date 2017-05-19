@@ -327,7 +327,11 @@ vector<vector<int16_t> > Astar::getPath(vector<vector<int16_t> > map) {
 			}
 		}
 	} 
-	return optimalPath;
+        vector<vector<int16_t>> reversedPath;
+        for (int16_t i = optimalPath.size()-1; i >= 0; i--) {
+          reversedPath.push_back(optimalPath[i]);
+        }
+	return reversedPath;
 }
 
 vector<vector<double> > Astar::indexPathToCoordinate(vector<vector<int16_t> > bestPath, vector<vector<double> > outerWalls) {
