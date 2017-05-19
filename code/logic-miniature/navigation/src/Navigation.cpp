@@ -26,12 +26,14 @@
 #include <opendavinci/odcore/strings/StringToolbox.h>
 
 #include <opendavinci/odcore/wrapper/Eigen.h>
+#include <opendavinci/odcore/data/TimeStamp.h>
 
 #include <odvdopendlvdata/GeneratedHeaders_ODVDOpenDLVData.h>
 #include <odvdminiature/GeneratedHeaders_ODVDMiniature.h>
 
 #include "Navigation.h"
 #include "Astar.h"
+#include "KalmanFilter.h"
 
 namespace opendlv {
 namespace logic {
@@ -55,6 +57,7 @@ Navigation::Navigation(const int &argc, char **argv)
     , m_xPositionLPS(0.0)
     , m_yPositionLPS(0.0)
     , m_yawLPS(0.04)
+    , m_timeLastLPSSignal()
     , m_prevLeftMotorDutyCycle(0)
     , m_prevRightMotorDutyCycle(0)
     , m_prevLeftWheelDirection(Direction::backward)
@@ -161,6 +164,14 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
   bool pathFound = false;
   std::vector<std::vector<double> > bestPathCoord;
 
+  // Setup extended Kalman filter
+  Eigen::Vector3d kalmanInitState(0.0, 0.0, 0.0);
+  Eigen::Matrix3d kalmanQ = Eigen::MatrixXd::Identity(3, 3);
+  Eigen::Matrix3d kalmanR = 0.001*Eigen::MatrixXd::Identity(3, 3);
+  Eigen::Matrix3d kalmanP_0 = Eigen::MatrixXd::Identity(3, 3);
+  KalmanFilter kalmanFilter(kalmanInitState, kalmanQ, kalmanR, kalmanP_0);
+  uint32_t testTick = 0;
+  
   while (getModuleStateAndWaitForRemainingTimeInTimeslice() == 
       odcore::data::dmcp::ModuleStateMessage::RUNNING) {
 
@@ -189,6 +200,17 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     std::cout << "Right IR sensor voltage: " << m_analogReadings[1] << std::endl;
     std::cout << "Left IR sensor voltage: " << m_analogReadings[5] << std::endl;
     
+    // If there is a new LPS reading available, do the update step in the Kalman filter
+    odcore::data::TimeStamp now;
+    double timeSinceLastLPSSignal = static_cast<double>(now.toMicroseconds() - m_timeLastLPSSignal.toMicroseconds())/1000000.0;
+    if (timeSinceLastLPSSignal < 1.0*m_deltaTime && testTick % 10 == 0) { // There is a new LPS reading available
+      kalmanFilter.doUpdateStep(m_xPositionLPS, m_yPositionLPS, m_yawLPS);
+    }
+    testTick++;
+    Eigen::Vector3d kalmanEstimate = kalmanFilter.getStateEstimate(); 
+    std::cout << "Kalman estimates: " << kalmanEstimate(0) << ", " << kalmanEstimate(1) << ", " << kalmanEstimate(2) << std::endl;
+    std::cout << "Actual coordinates: " << m_xPositionLPS << ", " << m_yPositionLPS << ", " << m_yawLPS << std::endl;
+
     // State follow path
     if(m_currentState == State::PathFollow)
     {
@@ -353,7 +375,15 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     sendMotorCommands(leftMotorDutyCycle, rightMotorDutyCycle);
     sendGPIOCommands(leftWheelDirection, rightWheelDirection);
 
+    // Do Kalman prediction step
+    double leftWheelSpeed = 0.6 * 100 * (leftMotorDutyCycle-25000) / 25000;
+    double rightWheelSpeed = 0.6 * 100 * (rightMotorDutyCycle-25000) / 25000;
+    leftWheelSpeed = (leftWheelDirection == Direction::forward) ? leftWheelSpeed : -leftWheelSpeed;
+    rightWheelSpeed = (rightWheelDirection == Direction::forward) ? rightWheelSpeed : -rightWheelSpeed;
+    kalmanFilter.doPredictionStep(leftWheelSpeed, rightWheelSpeed, m_deltaTime);
+        
     m_stateTimer += m_deltaTime;
+    std::cout << "m_deltaTime = " << m_deltaTime << std::endl;
 
     std::cout << "\n" << std::endl;
   }
@@ -504,6 +534,7 @@ void Navigation::nextContainer(odcore::data::Container &a_c)
     m_pruReading = distance;
   } else if (dataType == opendlv::model::State::ID()) {
     opendlv::model::State state = a_c.getData<opendlv::model::State>();
+    m_timeLastLPSSignal = a_c.getReceivedTimeStamp();
 
     m_xPositionLPS = static_cast<double>(state.getPosition().getX());
     m_yPositionLPS = static_cast<double>(state.getPosition().getY());
