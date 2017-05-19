@@ -170,7 +170,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
   Eigen::Matrix3d kalmanR = 0.001*Eigen::MatrixXd::Identity(3, 3);
   Eigen::Matrix3d kalmanP_0 = Eigen::MatrixXd::Identity(3, 3);
   KalmanFilter kalmanFilter(kalmanInitState, kalmanQ, kalmanR, kalmanP_0);
-  uint32_t testTick = 0;
+  //uint32_t testTick = 0;
   
   while (getModuleStateAndWaitForRemainingTimeInTimeslice() == 
       odcore::data::dmcp::ModuleStateMessage::RUNNING) {
@@ -203,25 +203,29 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     // If there is a new LPS reading available, do the update step in the Kalman filter
     odcore::data::TimeStamp now;
     double timeSinceLastLPSSignal = static_cast<double>(now.toMicroseconds() - m_timeLastLPSSignal.toMicroseconds())/1000000.0;
-    if (timeSinceLastLPSSignal < 1.0*m_deltaTime && testTick % 10 == 0) { // There is a new LPS reading available
+    if (timeSinceLastLPSSignal < m_deltaTime) {//&& testTick % 10 == 0) { // There is a new LPS reading available
       kalmanFilter.doUpdateStep(m_xPositionLPS, m_yPositionLPS, m_yawLPS);
     }
-    testTick++;
+    //testTick++;
     Eigen::Vector3d kalmanEstimate = kalmanFilter.getStateEstimate(); 
-    std::cout << "Kalman estimates: " << kalmanEstimate(0) << ", " << kalmanEstimate(1) << ", " << kalmanEstimate(2) << std::endl;
-    std::cout << "Actual coordinates: " << m_xPositionLPS << ", " << m_yPositionLPS << ", " << m_yawLPS << std::endl;
+    //std::cout << "Kalman estimates: " << kalmanEstimate(0) << ", " << kalmanEstimate(1) << ", " << kalmanEstimate(2) << std::endl;
+    //std::cout << "Actual coordinates: " << m_xPositionLPS << ", " << m_yPositionLPS << ", " << m_yawLPS << std::endl;
+
+    double xEstimate = kalmanEstimate(0);
+    double yEstimate = kalmanEstimate(1);
+    double yawEstimate = kalmanEstimate(2);
 
     // State follow path
     if(m_currentState == State::PathFollow)
     {
       const uint32_t baseMotorDutyCycleNs = 40000;
 
-      std::vector<double> targetPosition = pathUpdateCurrentTarget(m_xPositionLPS, m_yPositionLPS, bestPathCoord);
+      std::vector<double> targetPosition = pathUpdateCurrentTarget(xEstimate, yEstimate, bestPathCoord);
 
-      double headingX = cos(m_yawLPS);
-      double headingY = sin(m_yawLPS);
-      double diffX = targetPosition[0] - m_xPositionLPS;
-      double diffY = targetPosition[1] - m_yPositionLPS;
+      double headingX = cos(yawEstimate);
+      double headingY = sin(yawEstimate);
+      double diffX = targetPosition[0] - xEstimate;
+      double diffY = targetPosition[1] - yEstimate;
 
       // Calculate angle between vector pointing to target and vector pointing in the direction of the robot
       double angleToTarget = acos((headingX*diffX + headingY*diffY) /
@@ -376,8 +380,8 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     sendGPIOCommands(leftWheelDirection, rightWheelDirection);
 
     // Do Kalman prediction step
-    double leftWheelSpeed = 0.6 * 100 * (leftMotorDutyCycle-25000) / 25000;
-    double rightWheelSpeed = 0.6 * 100 * (rightMotorDutyCycle-25000) / 25000;
+    double leftWheelSpeed = 0.6 * 10 * (leftMotorDutyCycle-25000) / 25000;
+    double rightWheelSpeed = 0.6 * 10 * (rightMotorDutyCycle-25000) / 25000;
     leftWheelSpeed = (leftWheelDirection == Direction::forward) ? leftWheelSpeed : -leftWheelSpeed;
     rightWheelSpeed = (rightWheelDirection == Direction::forward) ? rightWheelSpeed : -rightWheelSpeed;
     kalmanFilter.doPredictionStep(leftWheelSpeed, rightWheelSpeed, m_deltaTime);
@@ -571,8 +575,10 @@ std::vector<double> Navigation::pathUpdateCurrentTarget(double currentX, double 
   double pointY = path[m_pathCurrentPointIndex][1];
   double distance = sqrt((pointX-currentX)*(pointX-currentX) + (pointY-currentY)*(pointY-currentY));
 
+  std::cout << ((m_followPathDirection == Direction::forward) ? "Going forward along path." : "Goint backwards along path.") << std::endl;
   if (distance < distanceToSwitchTargetPoint) {
     if (m_followPathDirection == Direction::forward){
+      //std::cout << "Following path in forward direction." << std::endl;
       // Following path in forward direction
       m_pathCurrentPointIndex++;
       if (m_pathCurrentPointIndex >= path.size()) {
@@ -580,6 +586,7 @@ std::vector<double> Navigation::pathUpdateCurrentTarget(double currentX, double 
         m_followPathDirection = Direction::backward;
       }
     } else {
+      //std::cout << "Following path in backward direction." << std::endl;
       // Following path in backward direction
       if (m_pathCurrentPointIndex == 0) {
         m_pathCurrentPointIndex = 1;
