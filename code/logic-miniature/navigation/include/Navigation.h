@@ -89,6 +89,11 @@ class Navigation :
   uint16_t m_pwmBaseSpeed;
   double m_sonarDetectionDistance;
   uint16_t m_irThreshold;
+  
+  double m_xStart;
+  double m_yStart;
+  double m_xTarget;
+  double m_yTarget;
 
 };
 
