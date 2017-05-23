@@ -53,23 +53,24 @@ Navigation::Navigation(const int &argc, char **argv)
     , m_gpioOutputPins()
     , m_pwmOutputPins()
     , m_pruReading()
-    , m_sonarDetectionTime()
     , m_xPositionLPS(0.0)
     , m_yPositionLPS(0.0)
-    , m_yawLPS(0.04)
+    , m_yawLPS(0.0)
     , m_timeLastLPSSignal()
     , m_prevLeftMotorDutyCycle(0)
     , m_prevRightMotorDutyCycle(0)
     , m_prevLeftWheelDirection(Direction::backward)
     , m_prevRightWheelDirection(Direction::backward)
     , m_PIDController(10000.0, 1000.0, 0.0)
-    , m_path() //m_path({{0.0, 0.0}, {25.0, 0.0}, {30.0, -5.0}, {30.0, -10.0}, {40.0, -10.0}, {40.0, -20.0}, {10.0, -20.0}, {5.0, -10.0}, {0.0, 0.0}})
     , m_pathCurrentPointIndex(0)
     , m_followPathDirection(Direction::forward)
     , m_currentState(State::Stop)
     , m_stateTimer(0.0)
     , m_stateTimeout(5.0)
     , m_deltaTime()
+    , m_pwmBaseSpeed()
+    , m_sonarDetectionDistance()
+    , m_irThreshold()
 {
 }
 
@@ -107,38 +108,26 @@ void Navigation::setUp()
   
   std::string const outerWallsString = 
       kv.getValue<std::string>("logic-miniature-navigation.outer-walls");
-  std::vector<data::environment::Point3> outerWallPoints = ReadPointString(outerWallsString);
-  if (outerWallPoints.size() == 4) {
-    m_outerWalls.push_back(data::environment::Line(outerWallPoints[0], outerWallPoints[1]));
-    m_outerWalls.push_back(data::environment::Line(outerWallPoints[1], outerWallPoints[2]));
-    m_outerWalls.push_back(data::environment::Line(outerWallPoints[2], outerWallPoints[3]));
-    m_outerWalls.push_back(data::environment::Line(outerWallPoints[3], outerWallPoints[0]));
 
-    std::cout << "Outer walls 1 - " << m_outerWalls[0].toString() <<  std::endl;
-    std::cout << "Outer walls 2 - " << m_outerWalls[1].toString() <<  std::endl;
-    std::cout << "Outer walls 3 - " << m_outerWalls[2].toString() <<  std::endl;
-    std::cout << "Outer walls 4 - " << m_outerWalls[3].toString() <<  std::endl;
-  } else {
+  m_outerWalls = ReadPointString(outerWallsString);
+
+  if(m_outerWalls.size() != 4) {
     std::cout << "Warning: Outer walls format error. (" << outerWallsString << ")" << std::endl;
   }
   
   std::string const innerWallsString = 
       kv.getValue<std::string>("logic-miniature-navigation.inner-walls");
-  std::vector<data::environment::Point3> innerWallPoints = ReadPointString(innerWallsString);
-  for (uint32_t i = 0; i < innerWallPoints.size(); i += 2) {
-    if (i < innerWallPoints.size() - 1) {
-      data::environment::Line innerWall(innerWallPoints[i], innerWallPoints[i+1]);
-      m_innerWalls.push_back(innerWall);
-      std::cout << "Inner wall - " << innerWall.toString() << std::endl;
-    }
-  }
+
+  m_innerWalls = ReadPointString(innerWallsString);
+  
   
   std::string const pointsOfInterestString = 
       kv.getValue<std::string>("logic-miniature-navigation.points-of-interest");
   m_pointsOfInterest = ReadPointString(pointsOfInterestString);
-  for (uint32_t i = 0; i < m_pointsOfInterest.size(); i++) {
-    std::cout << "Point of interest " << i << ": " << m_pointsOfInterest[i].toString() << std::endl;
-  }
+
+  m_pwmBaseSpeed = kv.getValue<uint16_t>("logic-miniature-navigation.pwmBaseSpeed");
+  m_sonarDetectionDistance = kv.getValue<double>("logic-miniature-navigation.sonarDetectionDistance");
+  m_irThreshold = kv.getValue<uint16_t>("logic-miniature-navigation.irThreshold");
 
   m_deltaTime = 1 / getFrequency();
 }
@@ -194,8 +183,8 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     bool irRightDetection = false;
     bool irLeftDetection = false;
-    if(m_analogReadings[1] < 850) irRightDetection = true;
-    if(m_analogReadings[5] < 850) irLeftDetection = true;
+    if(m_analogReadings[1] < m_irThreshold) irRightDetection = true;
+    if(m_analogReadings[5] < m_irThreshold) irLeftDetection = true;
 
     std::cout << "Right IR sensor voltage: " << m_analogReadings[1] << std::endl;
     std::cout << "Left IR sensor voltage: " << m_analogReadings[5] << std::endl;
@@ -218,7 +207,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     // State follow path
     if(m_currentState == State::PathFollow)
     {
-      const uint32_t baseMotorDutyCycleNs = 40000;
+      const uint32_t baseMotorDutyCycleNs = m_pwmBaseSpeed;
 
       std::vector<double> targetPosition = pathUpdateCurrentTarget(xEstimate, yEstimate, bestPathCoord);
 
@@ -249,30 +238,33 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       // Set motor pwms
       leftMotorDutyCycle = baseMotorDutyCycleNs + motorsDutyCycleDifference;
       rightMotorDutyCycle = baseMotorDutyCycleNs - motorsDutyCycleDifference;
+      leftWheelDirection = Direction::forward;
+      rightWheelDirection = Direction::forward;
+      // Limit input signals
       leftMotorDutyCycle = (leftMotorDutyCycle > 50000) ? 50000 : leftMotorDutyCycle;
       rightMotorDutyCycle = (rightMotorDutyCycle > 50000) ? 50000 : rightMotorDutyCycle;
       leftMotorDutyCycle = (leftMotorDutyCycle < 25000) ? 25000 : leftMotorDutyCycle;
       rightMotorDutyCycle = (rightMotorDutyCycle < 25000) ? 25000 : rightMotorDutyCycle;
-      leftWheelDirection = Direction::forward;
-      rightWheelDirection = Direction::forward;
      
-      if(sonarDistance < 30 || irLeftDetection || irRightDetection)
+      // Check for obstactles
+      if(sonarDistance < m_sonarDetectionDistance || irLeftDetection || irRightDetection)
       {
         m_currentState = State::Avoid;
         m_stateTimer = 0;
-        m_stateTimeout = 1.5;
+        m_stateTimeout = 0.5;
       }
     }
 
     if(m_currentState == State::Cruise)
     {
       std::cout << "Moving forward..." << std::endl;
-      leftMotorDutyCycle = 41000;
-      rightMotorDutyCycle = 41000;
+      leftMotorDutyCycle = m_pwmBaseSpeed;
+      rightMotorDutyCycle = m_pwmBaseSpeed;
       leftWheelDirection = Direction::forward;
       rightWheelDirection = Direction::forward;
 
-      if(sonarDistance < 40 || irLeftDetection || irRightDetection)
+      // Checkfor obstactles
+      if(sonarDistance < m_sonarDetectionDistance || irLeftDetection || irRightDetection)
       {
         m_currentState = State::Avoid;
         m_stateTimer = 0;
@@ -296,25 +288,25 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       if(turnDirection == Direction::right)
       {
         std::cout << "Turning right..." << std::endl;
-        leftMotorDutyCycle = 40000;
-        rightMotorDutyCycle = 40000;
+        leftMotorDutyCycle = m_pwmBaseSpeed;
+        rightMotorDutyCycle = m_pwmBaseSpeed;
         leftWheelDirection = Direction::forward;
         rightWheelDirection = Direction::backward;
       }
       else
       {
         std::cout << "Turning left..." << std::endl;
-        leftMotorDutyCycle = 40000;
-        rightMotorDutyCycle = 40000;
+        leftMotorDutyCycle = m_pwmBaseSpeed;
+        rightMotorDutyCycle = m_pwmBaseSpeed;
         leftWheelDirection = Direction::backward;
         rightWheelDirection = Direction::forward;
       }
 
       if(m_stateTimer > m_stateTimeout)
       {
-        if(!(sonarDistance < 40))
+        if(!(sonarDistance < m_sonarDetectionDistance))
         {
-          m_currentState = State::Cruise;//State::PathFollow;
+          m_currentState = State::PathFollow;
           m_stateTimer = 0;
           turnDirectionSet = false;
         }
@@ -324,39 +316,40 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     // State Stop
     if(m_currentState == State::Stop)
     {
-      leftMotorDutyCycle = 0;
-      rightMotorDutyCycle = 0;
+      leftMotorDutyCycle = 25000;
+      rightMotorDutyCycle = 25000;
+      leftWheelDirection = Direction::forward;
+      rightWheelDirection = Direction::forward;
 
       if(m_stateTimer > m_stateTimeout)
       {
-        m_currentState = State::Cruise;//State::PathFollow;
+        m_currentState = State::PathFollow;
         m_stateTimer = 0;
       }
     }
 	
 	if (!pathFound) {
-		std::vector<std::vector<double> > outerWalls = {{50.84, -23.93}, {-9.48, -24.49}, {-9.70, 5.50}, {50.54, 5.65}};
-
-		std::vector<std::vector<double> > innerWalls = {{40.02, 5.86},{39.76, -6.63}, {2.88,5.33}, {2.92,0.57}, {-9.71,-4.17}, {-7.45,-4.11}, {33.06,-24.10}, {33.08,-19.09}, {33.08,-19.09}, {35.50,-19.10}, {20.74,-17.83}, {14.24,-7.36}, {14.24,-7.36}, {18.59,-4.93}, {18.59,-4.93}, {26.08,-6.93}, {26.08,-6.93}, {20.74,-17.83}};
 
 		Astar aStar;
 		aStar.setMapSize(60,30); // Set mapSize
+
 		double xStart = -5.0;
 		double yStart = 0.0;
 		double xTarget = 45.0;
 		double yTarget = -15.0;
-		std::vector<int16_t> startIndex = aStar.coordToIndex(xStart,yStart,outerWalls);
-		std::vector<int16_t> targetIndex = aStar.coordToIndex(xTarget,yTarget,outerWalls);
+
+		std::vector<int16_t> startIndex = aStar.coordToIndex(xStart,yStart,m_outerWalls);
+		std::vector<int16_t> targetIndex = aStar.coordToIndex(xTarget,yTarget,m_outerWalls);
 		cout << "Start Index: " << startIndex[0] << " " << startIndex[1] << endl;
 		cout << "Target Index: " << targetIndex[0] << " " << targetIndex[1] << endl;
 		aStar.startNode.set_position(startIndex[0],startIndex[1]); // Set start
 		aStar.targetNode.set_position(targetIndex[0],targetIndex[1]); // Set target
 
-		std::vector<std::vector<int16_t> > map = aStar.createMap(outerWalls, innerWalls);
+		std::vector<std::vector<int16_t> > map = aStar.createMap(m_outerWalls, m_innerWalls);
 		std::vector<std::vector<int16_t> > bestPath = aStar.getPath(map);
 
 		//aStar.printMap(map, bestPath);
-		bestPathCoord = aStar.indexPathToCoordinate(bestPath, outerWalls);
+		bestPathCoord = aStar.indexPathToCoordinate(bestPath, m_outerWalls);
 		pathFound = true;
 		/*for (uint16_t i=0; i<bestPathCoord.size(); i++) {
 			cout << "Idx: " << bestPath[i][0] << " " << bestPath[i][1] << endl;
@@ -387,17 +380,14 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     kalmanFilter.doPredictionStep(leftWheelSpeed, rightWheelSpeed, m_deltaTime);
         
     m_stateTimer += m_deltaTime;
-    std::cout << "m_deltaTime = " << m_deltaTime << std::endl;
 
-    std::cout << "\n" << std::endl;
+    std::cout << std::endl;
   }
   return odcore::data::dmcp::ModuleExitCodeMessage::OKAY;
 }
 
 void Navigation::sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMotorDutyCycle)
 {
-    //std::cout << "Pwm left motor: " << leftMotorDutyCycle << std::endl;
-    //std::cout << "Pwm right motor: " << rightMotorDutyCycle << std::endl;
 
   if(leftMotorDutyCycle != m_prevLeftMotorDutyCycle)
   {
@@ -409,7 +399,7 @@ void Navigation::sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMo
 
     m_prevLeftMotorDutyCycle = leftMotorDutyCycle;
 
-    std::cout << "SEND  " << leftMotorDutyCycle << " to left motor" << std::endl;
+    std::cout << "SEND  pwm:" << leftMotorDutyCycle << " to left motor" << std::endl;
   }
 
   if(rightMotorDutyCycle != m_prevRightMotorDutyCycle)
@@ -447,7 +437,7 @@ void Navigation::sendGPIOCommands(Direction leftWheelDirection, Direction rightW
       getConference().send(c31);
       std::cout << "SET gpio 31 OFF (left wheel forward)" << std::endl;
     }
-    else
+    else if(leftWheelDirection == Direction::backward)
     {
       opendlv::proxy::ToggleRequest request30(30, stateOff);
       odcore::data::Container c30(request30);
@@ -476,7 +466,7 @@ void Navigation::sendGPIOCommands(Direction leftWheelDirection, Direction rightW
       getConference().send(c60);
       std::cout << "SET gpio 60 OFF (right wheel forward)" << std::endl;
     }
-    else
+    else if(rightWheelDirection == Direction::backward)
     {
       opendlv::proxy::ToggleRequest request51(51, stateOff);
       odcore::data::Container c51(request51);
@@ -544,24 +534,28 @@ void Navigation::nextContainer(odcore::data::Container &a_c)
     m_yPositionLPS = static_cast<double>(state.getPosition().getY());
     m_yawLPS = static_cast<double>(state.getAngularDisplacement().getZ());
   
+    //m_xPositionLPS = 10*m_xPositionLPS; 
+    //m_yPositionLPS = 10*m_yPositionLPS;
     //std::cout << "[" << getName() << "] Received a LPS-reading: "
     //    << state.toString() << "." << std::endl;
   }
 }
 
-std::vector<data::environment::Point3> Navigation::ReadPointString(std::string const &a_pointsString) const
+std::vector<std::vector<double>> Navigation::ReadPointString(std::string const &a_pointsString) const
 {
-  std::vector<data::environment::Point3> points;
+  std::vector<std::vector<double>> points;
+
   std::vector<std::string> pointStringVector = 
       odcore::strings::StringToolbox::split(a_pointsString, ';');
+
   for (auto pointString : pointStringVector) {
     std::vector<std::string> coordinateVector = 
         odcore::strings::StringToolbox::split(pointString, ',');
     if (coordinateVector.size() == 2) {
-      double x = std::stod(coordinateVector[0]);
-      double y = std::stod(coordinateVector[1]);
-      double z = 0.0;
-      points.push_back(data::environment::Point3(x, y, z));
+      std::vector<double> coordinate;
+      coordinate.push_back(std::stod(coordinateVector[0]));
+      coordinate.push_back(std::stod(coordinateVector[1]));
+      points.push_back(coordinate);
     }
   }
   return points;
@@ -575,10 +569,10 @@ std::vector<double> Navigation::pathUpdateCurrentTarget(double currentX, double 
   double pointY = path[m_pathCurrentPointIndex][1];
   double distance = sqrt((pointX-currentX)*(pointX-currentX) + (pointY-currentY)*(pointY-currentY));
 
-  std::cout << ((m_followPathDirection == Direction::forward) ? "Going forward along path." : "Goint backwards along path.") << std::endl;
+  std::cout << ((m_followPathDirection == Direction::forward) ? "Going forward along path." : "Going backwards along path.") << std::endl;
   if (distance < distanceToSwitchTargetPoint) {
+      std::cout << "NEXT TARGET" << std::endl;
     if (m_followPathDirection == Direction::forward){
-      //std::cout << "Following path in forward direction." << std::endl;
       // Following path in forward direction
       m_pathCurrentPointIndex++;
       if (m_pathCurrentPointIndex >= path.size()) {
@@ -586,7 +580,6 @@ std::vector<double> Navigation::pathUpdateCurrentTarget(double currentX, double 
         m_followPathDirection = Direction::backward;
       }
     } else {
-      //std::cout << "Following path in backward direction." << std::endl;
       // Following path in backward direction
       if (m_pathCurrentPointIndex == 0) {
         m_pathCurrentPointIndex = 1;

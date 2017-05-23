@@ -123,6 +123,10 @@ proxy-miniature-lps.debug = 1
 # CONFIGURATION FOR SYSTEM
 #
 
+logic-miniature-navigation.pwmBaseSpeed = 40000
+logic-miniature-navigation.sonarDetectionDistance = 40  # (cm)
+logic-miniature-navigation.irThreshold = 850
+
 logic-miniature-navigation.gpio-pins = 31
 logic-miniature-navigation.pwm-pins = 0,1
 logic-miniature-navigation.outer-walls = 50.84,-23.93;-9.48,-24.49;-9.70,5.50;50.54,5.65;

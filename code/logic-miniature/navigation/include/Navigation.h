@@ -48,7 +48,7 @@ class Navigation :
   void setUp();
   void tearDown();
   virtual odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode body();
-  std::vector<data::environment::Point3> ReadPointString(std::string const &) const;
+  std::vector<std::vector<double>> ReadPointString(std::string const &) const;
   std::vector<double> pathUpdateCurrentTarget(double, double, std::vector<std::vector<double>>);
 
   enum Direction {forward, backward, right, left};
@@ -58,16 +58,15 @@ class Navigation :
   void sendGPIOCommands(Direction leftWheelDirection, Direction rightWheelDirection);
 
   odcore::base::Mutex m_mutex;
-  std::vector<data::environment::Line> m_outerWalls;
-  std::vector<data::environment::Line> m_innerWalls;
-  std::vector<data::environment::Point3> m_pointsOfInterest;
+  std::vector<std::vector<double>> m_outerWalls;
+  std::vector<std::vector<double>> m_innerWalls;
+  std::vector<std::vector<double>> m_pointsOfInterest;
   std::map<uint16_t, float> m_analogReadings;
   std::map<uint16_t, bool> m_gpioReadings;
   std::vector<uint16_t> m_gpioOutputPins;
   std::vector<uint16_t> m_pwmOutputPins;
 
   double m_pruReading;
-  odcore::data::TimeStamp m_sonarDetectionTime;
   double m_xPositionLPS;
   double m_yPositionLPS;
   double m_yawLPS;
@@ -79,7 +78,6 @@ class Navigation :
   Direction m_prevRightWheelDirection;
   
   PIDController m_PIDController;
-  std::vector<std::vector<double>> m_path;
   uint16_t m_pathCurrentPointIndex;
   Direction m_followPathDirection;
   
@@ -87,6 +85,11 @@ class Navigation :
   double m_stateTimer;
   double m_stateTimeout;
   double m_deltaTime;
+
+  uint16_t m_pwmBaseSpeed;
+  double m_sonarDetectionDistance;
+  uint16_t m_irThreshold;
+
 };
 
 }
