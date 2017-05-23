@@ -223,7 +223,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Differential::body()
     getConference().send(c);
 
     // Simulate LPS.
-    opendlv::model::Cartesian3 lpsPosition(static_cast<float>(posX), static_cast<float>(posY), 0.0f);
+    opendlv::model::Cartesian3 lpsPosition(static_cast<float>(posX/10.0), static_cast<float>(posY/10.0), 0.0f);
     opendlv::model::Cartesian3 lpsOrientation(0.0f, 0.0f, static_cast<float>(yaw));
     opendlv::model::State lpsState(lpsPosition, lpsOrientation, 0);
     odcore::data::Container lpsContainer(lpsState);

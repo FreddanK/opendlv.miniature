@@ -187,15 +187,15 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     // Get sensor distances
     double sonarDistance = m_pruReading; // (centimeters)
     if(sonarDistance < 0) sonarDistance = 4000;
-    //std::cout << "Sonar distance (cm): " << sonarDistance << std::endl;
+    std::cout << "Sonar distance (cm): " << sonarDistance << std::endl;
 
     bool irRightDetection = false;
     bool irLeftDetection = false;
     if(m_analogReadings[1] < m_irThreshold) irRightDetection = true;
     if(m_analogReadings[5] < m_irThreshold) irLeftDetection = true;
 
-    //std::cout << "Right IR sensor voltage: " << m_analogReadings[1] << std::endl;
-    //std::cout << "Left IR sensor voltage: " << m_analogReadings[5] << std::endl;
+    std::cout << "Right IR sensor voltage: " << m_analogReadings[1] << std::endl;
+    std::cout << "Left IR sensor voltage: " << m_analogReadings[5] << std::endl;
     
     // If there is a new LPS reading available, do the update step in the Kalman filter
     odcore::data::TimeStamp now;
@@ -205,8 +205,8 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     }
     //testTick++;
     Eigen::Vector3d kalmanEstimate = kalmanFilter.getStateEstimate(); 
-    //std::cout << "Kalman estimates: " << kalmanEstimate(0) << ", " << kalmanEstimate(1) << ", " << kalmanEstimate(2) << std::endl;
-    //std::cout << "Actual coordinates: " << m_xPositionLPS << ", " << m_yPositionLPS << ", " << m_yawLPS << std::endl;
+    std::cout << "Kalman estimates: " << kalmanEstimate(0) << ", " << kalmanEstimate(1) << ", " << kalmanEstimate(2) << std::endl;
+    std::cout << "Actual coordinates: " << m_xPositionLPS << ", " << m_yPositionLPS << ", " << m_yawLPS << std::endl;
 
     double xEstimate = kalmanEstimate(0);
     double yEstimate = kalmanEstimate(1);
@@ -292,13 +292,13 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
     if(m_currentState == State::Cruise)
     {
-      //std::cout << "Moving forward..." << std::endl;
+      std::cout << "Moving forward..." << std::endl;
       leftMotorDutyCycle = m_pwmBaseSpeed;
       rightMotorDutyCycle = m_pwmBaseSpeed;
       leftWheelDirection = Direction::forward;
       rightWheelDirection = Direction::forward;
 
-      // Checkfor obstactles
+      // Check for obstactles
       if(sonarDistance < m_sonarDetectionDistance || irLeftDetection || irRightDetection)
       {
         m_currentState = State::Avoid;
@@ -323,7 +323,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
 
       if(turnDirection == Direction::right)
       {
-        //std::cout << "Turning right..." << std::endl;
+        std::cout << "Turning right..." << std::endl;
         leftMotorDutyCycle = m_pwmBaseSpeed;
         rightMotorDutyCycle = m_pwmBaseSpeed;
         leftWheelDirection = Direction::forward;
@@ -331,7 +331,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       }
       else
       {
-        //std::cout << "Turning left..." << std::endl;
+        std::cout << "Turning left..." << std::endl;
         leftMotorDutyCycle = m_pwmBaseSpeed;
         rightMotorDutyCycle = m_pwmBaseSpeed;
         leftWheelDirection = Direction::backward;
@@ -389,7 +389,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
         
     m_stateTimer += m_deltaTime;
 
-    //std::cout << std::endl;
+    std::cout << std::endl;
   }
   return odcore::data::dmcp::ModuleExitCodeMessage::OKAY;
 }
@@ -407,7 +407,7 @@ void Navigation::sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMo
 
     m_prevLeftMotorDutyCycle = leftMotorDutyCycle;
 
-    //std::cout << "SEND  pwm:" << leftMotorDutyCycle << " to left motor" << std::endl;
+    std::cout << "SEND  pwm:" << leftMotorDutyCycle << " to left motor" << std::endl;
   }
 
   if(rightMotorDutyCycle != m_prevRightMotorDutyCycle)
@@ -420,7 +420,7 @@ void Navigation::sendMotorCommands(uint32_t leftMotorDutyCycle, uint32_t rightMo
 
     m_prevRightMotorDutyCycle = rightMotorDutyCycle;
 
-    //std::cout << "SEND pwm: " << rightMotorDutyCycle << " to right motor" << std::endl;
+    std::cout << "SEND pwm: " << rightMotorDutyCycle << " to right motor" << std::endl;
   }
 }
 
@@ -438,24 +438,24 @@ void Navigation::sendGPIOCommands(Direction leftWheelDirection, Direction rightW
       opendlv::proxy::ToggleRequest request30(30, stateOn);
       odcore::data::Container c30(request30);
       getConference().send(c30);
-      //std::cout << "SET gpio 30 ON (left wheel forward)" << std::endl;
+      std::cout << "SET gpio 30 ON (left wheel forward)" << std::endl;
 
       opendlv::proxy::ToggleRequest request31(31, stateOff);
       odcore::data::Container c31(request31);
       getConference().send(c31);
-      //std::cout << "SET gpio 31 OFF (left wheel forward)" << std::endl;
+      std::cout << "SET gpio 31 OFF (left wheel forward)" << std::endl;
     }
     else if(leftWheelDirection == Direction::backward)
     {
       opendlv::proxy::ToggleRequest request30(30, stateOff);
       odcore::data::Container c30(request30);
       getConference().send(c30);
-      //std::cout << "SET gpio 30 OFF (left wheel backward)" << std::endl;
+      std::cout << "SET gpio 30 OFF (left wheel backward)" << std::endl;
 
       opendlv::proxy::ToggleRequest request31(31, stateOn);
       odcore::data::Container c31(request31);
       getConference().send(c31);
-      //std::cout << "SET gpio 31 ON (left wheel backward)" << std::endl;
+      std::cout << "SET gpio 31 ON (left wheel backward)" << std::endl;
     }
   }
 
@@ -467,24 +467,24 @@ void Navigation::sendGPIOCommands(Direction leftWheelDirection, Direction rightW
       opendlv::proxy::ToggleRequest request51(51, stateOn);
       odcore::data::Container c51(request51);
       getConference().send(c51);
-      //std::cout << "SET gpio 51 ON (right wheel forward)" << std::endl;
+      std::cout << "SET gpio 51 ON (right wheel forward)" << std::endl;
 
       opendlv::proxy::ToggleRequest request60(60, stateOff);
       odcore::data::Container c60(request60);
       getConference().send(c60);
-      //std::cout << "SET gpio 60 OFF (right wheel forward)" << std::endl;
+      std::cout << "SET gpio 60 OFF (right wheel forward)" << std::endl;
     }
     else if(rightWheelDirection == Direction::backward)
     {
       opendlv::proxy::ToggleRequest request51(51, stateOff);
       odcore::data::Container c51(request51);
       getConference().send(c51);
-      //std::cout << "SET gpio 51 OFF (right wheel backward)" << std::endl;
+      std::cout << "SET gpio 51 OFF (right wheel backward)" << std::endl;
 
       opendlv::proxy::ToggleRequest request60(60, stateOn);
       odcore::data::Container c60(request60);
       getConference().send(c60);
-      //std::cout << "SET gpio 60 ON (right wheel backward)" << std::endl;
+      std::cout << "SET gpio 60 ON (right wheel backward)" << std::endl;
     }
   }
 }
@@ -542,8 +542,9 @@ void Navigation::nextContainer(odcore::data::Container &a_c)
     m_yPositionLPS = static_cast<double>(state.getPosition().getY());
     m_yawLPS = static_cast<double>(state.getAngularDisplacement().getZ());
   
-    //m_xPositionLPS = 10*m_xPositionLPS; 
-    //m_yPositionLPS = 10*m_yPositionLPS;
+    // Convert lps position from meters to decimeters
+    m_xPositionLPS = 10*m_xPositionLPS; 
+    m_yPositionLPS = 10*m_yPositionLPS;
     //std::cout << "[" << getName() << "] Received a LPS-reading: "
     //    << state.toString() << "." << std::endl;
   }
