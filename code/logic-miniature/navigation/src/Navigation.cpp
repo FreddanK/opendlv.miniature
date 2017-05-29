@@ -75,6 +75,8 @@ Navigation::Navigation(const int &argc, char **argv)
     , m_yStart()
     , m_xTarget()
     , m_yTarget()
+    , m_pathFollowOn()
+    , m_initialized(false)
 {
 }
 
@@ -137,6 +139,8 @@ void Navigation::setUp()
   m_xTarget = kv.getValue<double>("logic-miniature-navigation.xTarget");
   m_yTarget = kv.getValue<double>("logic-miniature-navigation.yTarget");
 
+  m_pathFollowOn = kv.getValue<bool>("logic-miniature-navigation.pathFollowOn");
+
   m_deltaTime = 1 / getFrequency();
 }
 
@@ -165,7 +169,7 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
   Eigen::Vector3d kalmanInitState(0.0, 0.0, 0.0);
   Eigen::Matrix3d kalmanQ = Eigen::MatrixXd::Identity(3, 3);
   Eigen::Matrix3d kalmanR = 0.001*Eigen::MatrixXd::Identity(3, 3);
-  Eigen::Matrix3d kalmanP_0 = Eigen::MatrixXd::Identity(3, 3);
+  Eigen::Matrix3d kalmanP_0 = 0*Eigen::MatrixXd::Identity(3, 3);
   KalmanFilter kalmanFilter(kalmanInitState, kalmanQ, kalmanR, kalmanP_0);
   //uint32_t testTick = 0;
   
@@ -200,7 +204,8 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     // If there is a new LPS reading available, do the update step in the Kalman filter
     odcore::data::TimeStamp now;
     double timeSinceLastLPSSignal = static_cast<double>(now.toMicroseconds() - m_timeLastLPSSignal.toMicroseconds())/1000000.0;
-    if (timeSinceLastLPSSignal < m_deltaTime) {//&& testTick % 10 == 0) { // There is a new LPS reading available
+    if ((timeSinceLastLPSSignal < m_deltaTime) && m_initialized) {//&& testTick % 10 == 0) { // There is a new LPS reading available
+
       kalmanFilter.doUpdateStep(m_xPositionLPS, m_yPositionLPS, m_yawLPS);
     }
     //testTick++;
@@ -342,7 +347,10 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       {
         if(!(sonarDistance < m_sonarDetectionDistance))
         {
-          m_currentState = State::PathFollow;
+          if(m_pathFollowOn)
+            m_currentState = State::PathFollow;
+          else
+            m_currentState = State::Cruise;
           m_stateTimer = 0;
           turnDirectionSet = false;
         }
@@ -354,13 +362,18 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     {
       leftMotorDutyCycle = 25000;
       rightMotorDutyCycle = 25000;
-      leftWheelDirection = Direction::forward;
-      rightWheelDirection = Direction::forward;
+      leftWheelDirection = Direction::backward;
+      rightWheelDirection = Direction::backward;
 
       if(m_stateTimer > m_stateTimeout)
       {
-        m_currentState = State::PathFollow;
+        if(m_pathFollowOn)
+          m_currentState = State::PathFollow;
+        else
+          m_currentState = State::Cruise;
+
         m_stateTimer = 0;
+
         std::cout << "START" << std::endl;
       }
     }
@@ -373,8 +386,11 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
       rightMotorDutyCycle = 0;
       leftWheelDirection = Direction::backward;
       rightWheelDirection = Direction::backward;
+      kalmanFilter.doUpdateStep(0,0,0);
+      kalmanFilter.doPredictionStep(0, 0, m_deltaTime);
 
       m_stateTimer = 0;
+      m_initialized = true;
     }
 
     sendMotorCommands(leftMotorDutyCycle, rightMotorDutyCycle);
@@ -385,7 +401,8 @@ odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode Navigation::body()
     double rightWheelSpeed = 0.6 * 10 * (rightMotorDutyCycle-25000) / 25000;
     leftWheelSpeed = (leftWheelDirection == Direction::forward) ? leftWheelSpeed : -leftWheelSpeed;
     rightWheelSpeed = (rightWheelDirection == Direction::forward) ? rightWheelSpeed : -rightWheelSpeed;
-    kalmanFilter.doPredictionStep(leftWheelSpeed, rightWheelSpeed, m_deltaTime);
+    if(m_initialized)
+      kalmanFilter.doPredictionStep(leftWheelSpeed, rightWheelSpeed, m_deltaTime);
         
     m_stateTimer += m_deltaTime;
 

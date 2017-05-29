@@ -95,6 +95,8 @@ class Navigation :
   double m_xTarget;
   double m_yTarget;
 
+  bool m_pathFollowOn;
+  bool m_initialized;
 };
 
 }

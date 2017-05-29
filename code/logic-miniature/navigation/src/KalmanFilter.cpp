@@ -1,5 +1,7 @@
 #include "KalmanFilter.h"
 
+#define PI 3.141592654
+
 KalmanFilter::KalmanFilter(Eigen::Vector3d initState)
   : m_stateEstimate(initState)
   , m_Q(Eigen::MatrixXd::Identity(3, 3))
@@ -114,7 +116,7 @@ Eigen::Vector3d KalmanFilter::modelFunction(double speedLeftWheel, double speedR
   double y = m_stateEstimate(1);
   double theta = m_stateEstimate(2);
 
-  x += dt*cos(theta)*((speedRightWheel+speedLeftWheel)/2);
+  x += dt*sin(PI/2.0 - theta)*((speedRightWheel+speedLeftWheel)/2);
   y += dt*sin(theta)*((speedRightWheel+speedLeftWheel)/2);
   theta += dt*(-(speedLeftWheel-speedRightWheel)/2);
 
@@ -139,7 +141,7 @@ Eigen::Matrix3d KalmanFilter::getModelJacobian(double speedLeftWheel, double spe
 
   Eigen::Matrix3d jacobian;
   jacobian << 1.0, 0, -sin(theta)*dt*((speedLeftWheel+speedRightWheel)/2),
-              0, 1.0,  cos(theta)*dt*((speedLeftWheel+speedRightWheel)/2),
+              0, 1.0,  sin(PI/2.0 - theta)*dt*((speedLeftWheel+speedRightWheel)/2),
               0,   0,  1.0;
 
   return jacobian;

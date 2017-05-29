@@ -160,6 +160,7 @@ sim-miniature-differential.debug = 1
 logic-miniature-navigation.pwmBaseSpeed = 40000
 logic-miniature-navigation.sonarDetectionDistance = 40  # (cm)
 logic-miniature-navigation.irThreshold = 850
+logic-miniature-navigation.pathFollowOn = 1
 
 logic-miniature-navigation.gpio-pins = 31
 logic-miniature-navigation.pwm-pins = 0,1
