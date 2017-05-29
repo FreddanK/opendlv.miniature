@@ -46,6 +46,8 @@ IRDetection::IRDetection(const int &argc, char **argv)
     , m_dutyCyclesNs()
     , m_analogReadings()
     , m_numberOfReadings()
+    , m_pwmOnSteps()
+    , m_pwmCounterMax()
 {
 }
 
@@ -60,6 +62,10 @@ void IRDetection::setUp()
 
   m_numberOfReadings = 
       kv.getValue<uint16_t>("proxy-miniature-irdetection.numberOfReadings");
+  m_pwmOnSteps = 
+      kv.getValue<uint16_t>("proxy-miniature-irdetection.pwmOnSteps");
+  m_pwmCounterMax = 
+      kv.getValue<uint16_t>("proxy-miniature-irdetection.pwmCounterMax");
 
   m_conversionConst = 
       kv.getValue<float>("proxy-miniature-irdetection.conversion-constant");
@@ -127,51 +133,63 @@ void IRDetection::tearDown()
 
 odcore::data::dmcp::ModuleExitCodeMessage::ModuleExitCode IRDetection::body()
 {
-  uint16_t count = 0;
+  uint16_t pwmCounter = 0;
+  uint16_t readingsCounter = 0;
 
   while (getModuleStateAndWaitForRemainingTimeInTimeslice() ==
       odcore::data::dmcp::ModuleStateMessage::RUNNING) {
-    if(m_initialised) 
+    if(!m_initialised) 
     {
-      if(count == 0) 
-      {
-        // Turn on pwm pins
-        for (uint32_t i = 0; i < m_pins.size(); i++) 
-        {
-          std:: cout << "Set Pwm Pin " << m_pins.at(i)
-              << " Duty cycle: " << m_dutyCyclesNs.at(i);
-          uint16_t pin = m_pins.at(i); 
-          uint32_t dutyCycleNs = m_dutyCyclesNs.at(i);
-          SetDutyCycleNs(pin, dutyCycleNs);
-          
-        }
-      }
-      else if(count == 1) 
-      {
-        // Turn off pwm pins
-        for (uint32_t i = 0; i < m_pins.size(); i++) 
-        {
-          std:: cout << "Set Pwm Pin " << m_pins.at(i)
-              << " Duty cycle: " << 0;
-          uint16_t pin = m_pins.at(i); 
-          uint32_t dutyCycleNs = 0;
-          SetDutyCycleNs(pin, dutyCycleNs);
-        }
-      }
+      continue;
+    }
 
-      // Read pins
-      ReadAnalogPins();
-
-      // Increase count
-      count++;
-
-      // Send readings to conference and reset
-      if (count >= m_numberOfReadings-1)
+    if(pwmCounter == 0) 
+    {
+      // Turn on pwm pins
+      for (uint32_t i = 0; i < m_pins.size(); i++) 
       {
-        count = 0;
-        SendAnalogReadings();
-        m_analogReadings = getReadings();
+        std:: cout << "Set Pwm Pin " << m_pins.at(i)
+            << " Duty cycle: " << m_dutyCyclesNs.at(i);
+        uint16_t pin = m_pins.at(i); 
+        uint32_t dutyCycleNs = m_dutyCyclesNs.at(i);
+        SetDutyCycleNs(pin, dutyCycleNs);
+        
       }
+    }
+    else if(pwmCounter >= m_pwmOnSteps) 
+    {
+      // Turn off pwm pins
+      for (uint32_t i = 0; i < m_pins.size(); i++) 
+      {
+        std:: cout << "Set Pwm Pin " << m_pins.at(i)
+            << " Duty cycle: " << 0;
+        uint16_t pin = m_pins.at(i); 
+        uint32_t dutyCycleNs = 0;
+        SetDutyCycleNs(pin, dutyCycleNs);
+      }
+    }
+
+    // increase pwm counter
+    pwmCounter++;
+
+    // Reset pwm counter
+    if(pwmCounter >= m_pwmCounterMax)
+      pwmCounter = 0;
+
+
+    // Read pins
+    ReadAnalogPins();
+
+    // Increase readings counter
+    readingsCounter++;
+
+
+    // Send readings to conference and reset
+    if (readingsCounter >= m_numberOfReadings)
+    {
+      readingsCounter = 0;
+      SendAnalogReadings();
+      m_analogReadings = getReadings();
     }
   }
   return odcore::data::dmcp::ModuleExitCodeMessage::OKAY;

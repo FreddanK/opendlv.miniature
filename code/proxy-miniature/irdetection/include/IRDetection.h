@@ -69,6 +69,9 @@ class IRDetection : public odcore::base::module::TimeTriggeredConferenceClientMo
 
   std::vector<std::pair<uint16_t, float>> m_analogReadings;
   uint16_t m_numberOfReadings;
+  uint16_t m_pwmOnSteps;
+  uint16_t m_pwmCounterMax;
+
 };
 
 }
